@@ -199,6 +199,20 @@ export const DEFAULT_LLM_CONNECTIVITY_MONITOR = {
   notifyMentionsByGroup: {},
 }
 
+export const DEFAULT_HOTSPOT_ALERT_CONFIG = {
+  enabled: false,
+  intervalMinutes: 10,
+  notifyMode: 'changes', // all | changes
+  platforms: ['douyin', 'xiaohongshu', 'wechat', 'weibo'],
+  selectedGroups: [],
+  notifyMentionsByGroup: {},
+  keywords: [],
+  topN: 10,
+  rankRiseThreshold: 5,
+  dedupeHours: 6,
+  maxAlertsPerRun: 8,
+}
+
 function nowIso() {
   return new Date().toISOString()
 }
@@ -357,6 +371,36 @@ function normalizeLLMConnectivityMonitorConfig(value = {}) {
   }
 }
 
+function normalizeHotspotAlertConfig(value = {}) {
+  const interval = Number(value.intervalMinutes)
+  const topN = Number(value.topN ?? value.top_n)
+  const rankRiseThreshold = Number(value.rankRiseThreshold ?? value.rank_rise_threshold)
+  const dedupeHours = Number(value.dedupeHours ?? value.dedupe_hours)
+  const maxAlertsPerRun = Number(value.maxAlertsPerRun ?? value.max_alerts_per_run)
+  const allowedPlatforms = new Set(DEFAULT_HOTSPOT_ALERT_CONFIG.platforms)
+  const platforms = normalizeStringArray(value.platforms || value.selectedPlatforms || value.selected_platforms || DEFAULT_HOTSPOT_ALERT_CONFIG.platforms)
+    .map(item => item.toLowerCase())
+    .filter(item => allowedPlatforms.has(item))
+  const notifyMode = ['all', 'changes'].includes(String(value.notifyMode || '').trim())
+    ? String(value.notifyMode || '').trim()
+    : DEFAULT_HOTSPOT_ALERT_CONFIG.notifyMode
+  return {
+    enabled: value.enabled === true,
+    intervalMinutes: Number.isFinite(interval) ? Math.min(1440, Math.max(5, Math.round(interval))) : DEFAULT_HOTSPOT_ALERT_CONFIG.intervalMinutes,
+    notifyMode,
+    platforms: platforms.length ? [...new Set(platforms)] : [...DEFAULT_HOTSPOT_ALERT_CONFIG.platforms],
+    selectedGroups: normalizeStringArray(value.selectedGroups || value.groupNames || value.groups || []),
+    notifyMentionsByGroup: normalizeStringMapOfArrays(
+      value.notifyMentionsByGroup || value.mentionsByGroup || value.notifyMentionIdsByGroup || {},
+    ),
+    keywords: normalizeStringArray(value.keywords || value.watchKeywords || value.watch_keywords || [], { max: 80 }),
+    topN: Number.isFinite(topN) ? Math.min(50, Math.max(1, Math.round(topN))) : DEFAULT_HOTSPOT_ALERT_CONFIG.topN,
+    rankRiseThreshold: Number.isFinite(rankRiseThreshold) ? Math.min(50, Math.max(1, Math.round(rankRiseThreshold))) : DEFAULT_HOTSPOT_ALERT_CONFIG.rankRiseThreshold,
+    dedupeHours: Number.isFinite(dedupeHours) ? Math.min(168, Math.max(1, Math.round(dedupeHours))) : DEFAULT_HOTSPOT_ALERT_CONFIG.dedupeHours,
+    maxAlertsPerRun: Number.isFinite(maxAlertsPerRun) ? Math.min(20, Math.max(1, Math.round(maxAlertsPerRun))) : DEFAULT_HOTSPOT_ALERT_CONFIG.maxAlertsPerRun,
+  }
+}
+
 function getProviderBaseURL(provider, customBaseURL = '') {
   if (provider === 'custom') return String(customBaseURL || '').trim()
   return PROVIDER_CONFIG[provider]?.baseURL || ''
@@ -477,17 +521,18 @@ function readStoredConfig(parsed = readConfigObject()) {
         llmProfiles: profiles,
         llmFailover: normalizeLLMFailoverConfig(parsed.llmFailover),
         llmConnectivityMonitor: normalizeLLMConnectivityMonitorConfig(parsed.llmConnectivityMonitor),
+        hotspotAlerts: normalizeHotspotAlertConfig(parsed.hotspotAlerts),
       }
     }
     if (!parsed.provider) return null
     if (parsed.provider === 'custom') {
       if (!parsed.baseURL || typeof parsed.baseURL !== 'string') return null
       if (!parsed.model || typeof parsed.model !== 'string') return null
-      return { ...parsed, llmProfiles: [], llmFailover: normalizeLLMFailoverConfig(parsed.llmFailover), llmConnectivityMonitor: normalizeLLMConnectivityMonitorConfig(parsed.llmConnectivityMonitor) }
+      return { ...parsed, llmProfiles: [], llmFailover: normalizeLLMFailoverConfig(parsed.llmFailover), llmConnectivityMonitor: normalizeLLMConnectivityMonitorConfig(parsed.llmConnectivityMonitor), hotspotAlerts: normalizeHotspotAlertConfig(parsed.hotspotAlerts) }
     }
     if (!PROVIDER_CONFIG[parsed.provider]) return null
     if (!parsed.apiKey || typeof parsed.apiKey !== 'string') return null
-    return { ...parsed, llmProfiles: [], llmFailover: normalizeLLMFailoverConfig(parsed.llmFailover), llmConnectivityMonitor: normalizeLLMConnectivityMonitorConfig(parsed.llmConnectivityMonitor) }
+    return { ...parsed, llmProfiles: [], llmFailover: normalizeLLMFailoverConfig(parsed.llmFailover), llmConnectivityMonitor: normalizeLLMConnectivityMonitorConfig(parsed.llmConnectivityMonitor), hotspotAlerts: normalizeHotspotAlertConfig(parsed.hotspotAlerts) }
   } catch {
     return null
   }
@@ -561,6 +606,7 @@ export const config = {
   llmProfiles: [],
   llmFailover: { ...DEFAULT_LLM_FAILOVER },
   llmConnectivityMonitor: { ...DEFAULT_LLM_CONNECTIVITY_MONITOR },
+  hotspotAlerts: { ...DEFAULT_HOTSPOT_ALERT_CONFIG },
   needsActivation: true,
   temperature: 0.5,
   security: {
@@ -577,6 +623,7 @@ if (stored) {
   config.activeLLMProfileId = stored.activeLLMProfileId || config.llmProfiles[0]?.id || null
   config.llmFailover = normalizeLLMFailoverConfig(stored.llmFailover)
   config.llmConnectivityMonitor = normalizeLLMConnectivityMonitorConfig(stored.llmConnectivityMonitor)
+  config.hotspotAlerts = normalizeHotspotAlertConfig(stored.hotspotAlerts)
   applyConfig(stored.provider, stored.apiKey, stored.model, stored.baseURL)
 } else if (shouldAllowEnvFallback()) {
   const fromEnv = loadFromEnv()
@@ -605,6 +652,9 @@ if (storedRaw?.security && typeof storedRaw.security === 'object') {
   if (typeof storedRaw.security.fileSandbox === 'boolean') config.security.fileSandbox = storedRaw.security.fileSandbox
   if (typeof storedRaw.security.execSandbox === 'boolean') config.security.execSandbox = storedRaw.security.execSandbox
   if (Array.isArray(storedRaw.security.blockedTools)) config.security.blockedTools = storedRaw.security.blockedTools
+}
+if (storedRaw?.hotspotAlerts && typeof storedRaw.hotspotAlerts === 'object') {
+  config.hotspotAlerts = normalizeHotspotAlertConfig(storedRaw.hotspotAlerts)
 }
 
 // At startup, copy social credentials from the config file into process.env so connectors can read them
@@ -669,6 +719,7 @@ function persistLLMState(extra = {}) {
     llmProfiles: config.llmProfiles,
     llmFailover: normalizeLLMFailoverConfig(config.llmFailover),
     llmConnectivityMonitor: normalizeLLMConnectivityMonitorConfig(config.llmConnectivityMonitor),
+    hotspotAlerts: normalizeHotspotAlertConfig(config.hotspotAlerts),
   }
   writeStoredConfig(next)
 }
@@ -836,6 +887,16 @@ export function setLLMConnectivityMonitorConfig(updates = {}) {
   config.llmConnectivityMonitor = normalizeLLMConnectivityMonitorConfig({ ...config.llmConnectivityMonitor, ...updates })
   persistLLMState()
   return getLLMConnectivityMonitorConfig()
+}
+
+export function getHotspotAlertConfig() {
+  return normalizeHotspotAlertConfig(config.hotspotAlerts)
+}
+
+export function setHotspotAlertConfig(updates = {}) {
+  config.hotspotAlerts = normalizeHotspotAlertConfig({ ...config.hotspotAlerts, ...updates })
+  persistLLMState()
+  return getHotspotAlertConfig()
 }
 
 export function getLLMProfiles() {

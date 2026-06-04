@@ -4,6 +4,7 @@ import { startWechatyDutyGroupConnector } from './wechaty-duty-group.js'
 import { startWeChatGroupDigestScheduler } from './wechat-group-digest.js'
 import { getWechatyDutyGroupConfig } from '../config.js'
 import { startLLMConnectivityMonitorScheduler } from '../llm-connectivity-monitor.js'
+import { startHotspotAlertScheduler } from '../hotspot-alert-monitor.js'
 
 const running = new Map() // platform → connector
 
@@ -38,6 +39,12 @@ export async function startSocialConnectors({ pushMessage, emitEvent } = {}) {
     startLLMConnectivityMonitorScheduler()
   } catch (error) {
     console.warn('[social] llm connectivity monitor scheduler failed:', error?.message || error)
+  }
+
+  try {
+    startHotspotAlertScheduler()
+  } catch (error) {
+    console.warn('[social] hotspot alert scheduler failed:', error?.message || error)
   }
 
   return [...running.values()]

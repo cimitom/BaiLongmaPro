@@ -12,6 +12,7 @@ import { isRunning, stopLoop, startLoop } from './control.js'
 import { buildHeartbeatSystemPromptPreview } from './system-prompt-preview.js'
 import { paths } from './paths.js'
 import { config, activate as activateLLM, getActivationStatus, switchModel, setTemperature, getMinimaxKey, setMinimaxKey, getSocialConfig, setSocialConfig, getHonchoConfig, setHonchoConfig, getWechatyDutyGroupConfig, setWechatyDutyGroupConfig, getWeChatGroupDigestConfig, setWeChatGroupDigestConfig, WECHATY_PERSONA_PRESETS, getVoiceConfig, setVoiceConfig, getTTSConfig, setTTSConfig, getTTSCredentials, getProviderSummaries, getSecurity, setSecurity, getEmbeddingConfig, setEmbeddingConfig, EMBEDDING_PROVIDER_PRESETS, getWebSearchConfig, setWebSearchConfig, upsertLLMProfile, deleteLLMProfile, selectLLMProfile, testLLMProfileConnection, setLLMFailoverConfig, getLLMConnectivityMonitorConfig, setLLMConnectivityMonitorConfig, getWechatMemeConfig, setWechatMemeConfig, getSkillsConfig, setSkillImageConfig, setSkillImageVisionConfig, setSkillVideoAnalysisConfig, testSkillModelChannel, listSkillModelChannelModels } from './config.js'
+import { getHotspotAlertConfig, setHotspotAlertConfig } from './config.js'
 import { streamTTS, TTS_PROVIDERS, TTS_VOICES } from './voice/tts-providers.js'
 import { getVoiceStatus, startVoiceServer, stopVoiceServer, restartVoiceServer } from './voice/manager.js'
 import { restartConnector } from './social/index.js'
@@ -31,6 +32,7 @@ import { getWeChatVideoAnalysisStatus } from './social/wechat-video-analysis-ski
 import { sendWeChatGroupDigestNow } from './social/wechat-group-digest.js'
 import { WECHAT_GROUP_REPORT_TEMPLATES, normalizeWeChatGroupReportTemplate, renderWeChatGroupStatsPosterHtml } from './social/wechat-group-report-template.js'
 import { getLLMConnectivityMonitorStatus, runLLMConnectivityMonitorCheck, startLLMConnectivityMonitorScheduler } from './llm-connectivity-monitor.js'
+import { getHotspotAlertStatus, runHotspotAlertCheck, startHotspotAlertScheduler } from './hotspot-alert-monitor.js'
 import { createCloudASRSession } from './voice/cloud-asr.js'
 import { getHotspots, setHotspotPanelState, getHotspotPanelState } from './hotspots.js'
 import { getPersonCard, setPersonCardPanelState, getPersonCardPanelState } from './person-cards.js'
@@ -1399,6 +1401,10 @@ export function startAPI(port = 3721, { getStateSnapshot = null, onActivated = n
           connectivityMonitor: getLLMConnectivityMonitorConfig(),
           connectivityMonitorStatus: getLLMConnectivityMonitorStatus(),
         },
+        hotspotAlerts: {
+          config: getHotspotAlertConfig(),
+          status: getHotspotAlertStatus(),
+        },
         providers: getProviderSummaries(),
         minimax: {
           configured: !!(globalThis.process?.env?.MINIMAX_API_KEY || minimaxKey),
@@ -1551,6 +1557,56 @@ export function startAPI(port = 3721, { getStateSnapshot = null, onActivated = n
         emitEvent('llm_connectivity_checked', { profiles: status.profiles, result })
         emitEvent('llm_profiles_updated', { activeProfileId: status.activeProfileId, profiles: status.profiles, failover: status.failover })
         return jsonResponse(res, 200, { ...result, profiles: status.profiles })
+      } catch (err) {
+        return jsonResponse(res, 400, { ok: false, error: err.message })
+      }
+    }
+
+    // GET /settings/hotspot-alerts — 读取舆情变动微信群推送配置和运行状态
+    if (req.method === 'GET' && url.pathname === '/settings/hotspot-alerts') {
+      if (!hasAllowedAccess(req, url)) return jsonResponse(res, 403, { ok: false, error: 'forbidden' })
+      return jsonResponse(res, 200, {
+        ok: true,
+        config: getHotspotAlertConfig(),
+        status: getHotspotAlertStatus(),
+        wechatyDutyGroupStatus: getWechatyDutyGroupStatus(),
+      })
+    }
+
+    // POST /settings/hotspot-alerts — 保存舆情变动微信群推送配置
+    if (req.method === 'POST' && url.pathname === '/settings/hotspot-alerts') {
+      if (!requireLocalOrToken(req, res, url)) return
+      try {
+        const body = await readJsonBody(req)
+        const cfg = setHotspotAlertConfig(body || {})
+        startHotspotAlertScheduler()
+        return jsonResponse(res, 200, {
+          ok: true,
+          config: cfg,
+          status: getHotspotAlertStatus(),
+          wechatyDutyGroupStatus: getWechatyDutyGroupStatus(),
+        })
+      } catch (err) {
+        return jsonResponse(res, 400, { ok: false, error: err.message })
+      }
+    }
+
+    // POST /settings/hotspot-alerts/check — 手动检查舆情变化，可选择立即通知已配置微信群
+    if (req.method === 'POST' && url.pathname === '/settings/hotspot-alerts/check') {
+      if (!requireLocalOrToken(req, res, url)) return
+      try {
+        const body = await readJsonBody(req).catch(() => ({}))
+        const result = await runHotspotAlertCheck({
+          notify: body.notify === true,
+          forceNotify: body.forceNotify === true || body.force_notify === true,
+        })
+        emitEvent('hotspot_alert_checked', { result })
+        return jsonResponse(res, 200, {
+          ...result,
+          config: getHotspotAlertConfig(),
+          status: getHotspotAlertStatus(),
+          wechatyDutyGroupStatus: getWechatyDutyGroupStatus(),
+        })
       } catch (err) {
         return jsonResponse(res, 400, { ok: false, error: err.message })
       }
