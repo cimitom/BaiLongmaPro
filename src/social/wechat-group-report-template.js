@@ -146,6 +146,52 @@ function buildConclusion(stats = {}, keywords = []) {
   return `本时段共记录 ${total} 条消息，${participants || 0} 位成员参与。${topicText}${mediaText}`
 }
 
+function buildInsightItems(stats = {}, keywords = [], timeline = [], boards = {}) {
+  const totals = stats.totals || {}
+  const total = Number(totals.message_count || 0)
+  const participants = Number(totals.participant_count || 0)
+  const images = Number(totals.image_count || 0)
+  const links = Number(totals.link_count || 0)
+  const rows = Array.isArray(timeline) ? timeline : []
+  if (!total) return ['这个时间段内没有足够聊天记录，暂时无法提炼有效结论。']
+
+  const items = []
+  if (keywords.length) {
+    items.push(`聊天主线集中在 ${keywords.slice(0, 4).map(item => `“${item.word}”`).join('、')}，可以优先回看这些话题对应的消息。`)
+  }
+  const keyRow = rows.find(row => /(重要|确定|决定|待办|安排|问题|风险|上线|发布|修复|报错|失败|需要|确认|结论|方案)/u.test(rowText(row, 180))) || rows[0]
+  if (keyRow) {
+    const who = shortName(rowName(keyRow), 8)
+    const when = formatClock(keyRow.timestamp) || '本时段'
+    const text = rowText(keyRow, 96)
+    if (text) items.push(`${when} ${who} 提到「${text}」，这是本轮最值得回看的上下文之一。`)
+  }
+  if (images || links) {
+    const parts = []
+    if (images) parts.push(`${images} 张图片`)
+    if (links) parts.push(`${links} 条链接`)
+    items.push(`本轮不只是闲聊，还有 ${parts.join('、')} 流动；图片按占位统计，链接可作为后续资料线索。`)
+  }
+  const topSpeaker = first(boards.messages)
+  const topImage = first(boards.images)
+  if (Number(topSpeaker.value || 0) > 0) {
+    items.push(`${shortName(topSpeaker.name, 8)} 发言最密集，贡献 ${topSpeaker.value} 条消息，基本代表本时段主要互动节奏。`)
+  }
+  if (Number(topImage.value || 0) > 0 && topImage.name !== topSpeaker.name) {
+    items.push(`${shortName(topImage.name, 8)} 贡献了最多图片，适合回看是否有截图、资料或表情素材需要跟进。`)
+  }
+  if (participants > 1) {
+    items.push(`共有 ${participants} 位成员参与，说明这不是单人流水账；下方时间线按可读消息保留关键节点。`)
+  }
+  return [...new Set(items)].slice(0, 5)
+}
+
+function insightSection(items = []) {
+  const rows = Array.isArray(items) ? items.filter(Boolean).slice(0, 5) : []
+  if (!rows.length) return ''
+  return `<section class="section insight-section"><h2>干货总结</h2><ul class="insight-list">${rows.map(item => `<li>${esc(item)}</li>`).join('')}</ul></section>`
+}
+
 function metricBlock(label, value, unit = '') {
   return `<div class="metric"><span>${esc(label)}</span><b>${esc(value)}</b><small>${esc(unit)}</small></div>`
 }
@@ -207,6 +253,7 @@ function buildData(stats = {}) {
     group: stats.group_name || stats.group_id || '本群',
     range: formatRange(stats.from, stats.to),
     conclusion: buildConclusion(stats, keywords),
+    insights: buildInsightItems(stats, keywords, timeline, boards),
     totals,
     boards,
     keywords,
@@ -218,7 +265,7 @@ function buildData(stats = {}) {
 const css = `
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;width:720px;background:#fff;color:#1f2328;font-family:"PingFang SC","Microsoft YaHei",Arial,sans-serif}
-body{overflow-x:hidden}
+body{overflow-x:hidden;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 .summary-card{width:720px;margin:0;background:#fff;padding:52px 46px 42px}
 .hero{border-bottom:4px solid var(--accent);padding-bottom:28px}
 .eyebrow{margin:0 0 18px;color:var(--accent);font-size:20px;font-weight:900;letter-spacing:.14em;text-transform:uppercase}
@@ -234,6 +281,9 @@ h1{margin:0;color:var(--ink);font-size:46px;line-height:1.16;font-weight:950;let
 .metric small{display:block;margin-top:5px;color:#6a737d;font-size:16px;font-weight:800}
 .section{padding:34px 0;border-bottom:1px solid #d8dee7}
 h2{margin:0 0 18px;color:var(--ink);font-size:30px;line-height:1.2;font-weight:950}
+.insight-list{display:grid;gap:16px;margin:0;padding:0;list-style:none}
+.insight-list li{position:relative;padding-left:28px;color:#262c34;font-size:22px;line-height:1.55;font-weight:760}
+.insight-list li:before{content:"";position:absolute;left:0;top:.62em;width:10px;height:10px;background:var(--accent)}
 .topic-list,.rank-list{margin:0;padding:0;list-style:none}
 .topic-list{display:grid;gap:18px}
 .topic-list li{border-left:5px solid var(--accent);padding-left:16px}
@@ -274,6 +324,7 @@ export function renderWeChatGroupStatsPosterHtml(stats = {}, { templateId = 'guo
       <div class="meta"><span>统计范围：${esc(d.range)}</span><span>生成时间：${esc(d.generatedAt)}</span></div>
     </header>
     <p class="lead"><b>一句话总结</b><span>${esc(d.conclusion)}</span></p>
+    ${insightSection(d.insights)}
     <section class="metrics" aria-label="数据概览">
       ${metricBlock('消息总量', totals.message_count || 0, '条')}
       ${metricBlock('参与成员', totals.participant_count || 0, '人')}

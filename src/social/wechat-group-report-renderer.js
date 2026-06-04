@@ -78,7 +78,8 @@ export async function renderWeChatGroupStatsPosterPng(stats = {}, { templateId =
   const executablePath = resolveChromiumExecutable()
   const browser = await chromium.launch({ headless: true, ...(executablePath ? { executablePath } : {}) })
   try {
-    const page = await browser.newPage({ viewport: { width: 720, height: 1280 }, deviceScaleFactor: 1 })
+    // CSS 仍按 720px 手机长图排版，截图用 2x 像素密度提升微信里查看时的文字清晰度。
+    const page = await browser.newPage({ viewport: { width: 720, height: 1280 }, deviceScaleFactor: 2 })
     await page.goto('file://' + htmlPath, { waitUntil: 'load' })
     await page.screenshot({ path: pngPath, fullPage: true, type: 'png' })
     await page.close()
