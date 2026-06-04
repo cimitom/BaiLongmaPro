@@ -3,6 +3,7 @@ import { getHotspotAlertConfig } from './config.js'
 import { getHotspots } from './hotspots.js'
 import { nowTimestamp } from './time.js'
 import { getWechatyDutyGroupStatus, sendWechatyDutyGroupMessage } from './social/wechaty-duty-group.js'
+import { renderHotspotAlertPosterPng } from './hotspot-alert-renderer.js'
 
 const PLATFORM_LABELS = {
   douyin: '抖音',
@@ -236,16 +237,40 @@ async function sendNotifications(events = [], cfg = {}, { forceNotify = false } 
   const groups = resolveNotifyGroups(cfg)
   if (!groups.length) return { ok: false, skipped: true, reason: 'no_notify_groups_selected_or_online' }
   const text = buildNotificationText(events, cfg)
+  let poster = null
+  let posterError = ''
+  try {
+    poster = await renderHotspotAlertPosterPng(events, cfg)
+  } catch (err) {
+    posterError = err?.message || String(err)
+    console.warn(`[HotspotAlert] 舆情海报渲染失败，回退文字：${posterError}`)
+  }
   const sent = []
   for (const group of groups) {
     const mentionIds = resolveNotifyMentionIdsForGroup(cfg, group)
-    const result = await sendWechatyDutyGroupMessage(group.roomId, text, { mentionIds })
-    sent.push({ ...group, mention_count: mentionIds.length, ok: !!result?.ok, result })
+    let result = null
+    let mode = 'text'
+    if (poster?.ok && poster.filePath) {
+      mode = 'image'
+      result = await sendWechatyDutyGroupMessage(group.roomId, '', {
+        mentionIds,
+        imageFilePaths: [poster.filePath],
+        timeoutMs: 45000,
+      })
+      if (!result?.ok) {
+        console.warn(`[HotspotAlert] 舆情海报发送失败，回退文字 group="${group.groupName}" reason="${result?.reason || result?.error || 'unknown'}"`)
+        mode = 'text_fallback'
+        result = await sendWechatyDutyGroupMessage(group.roomId, text, { mentionIds })
+      }
+    } else {
+      result = await sendWechatyDutyGroupMessage(group.roomId, text, { mentionIds })
+    }
+    sent.push({ ...group, mention_count: mentionIds.length, ok: !!result?.ok, mode, result })
   }
   const now = Date.now()
   for (const event of events) sentAtByEvent.set(event.id, now)
   lastNotifyAt = nowTimestamp()
-  return { ok: sent.some(item => item.ok), groups: sent, text }
+  return { ok: sent.some(item => item.ok), groups: sent, text, poster: poster?.ok ? poster : null, poster_error: posterError }
 }
 
 export async function runHotspotAlertCheck({ notify = false, forceNotify = false } = {}) {
