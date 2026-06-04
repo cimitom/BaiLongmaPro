@@ -304,22 +304,37 @@ async function parseUrl(url = '') {
   const timer = setTimeout(() => controller.abort(), 25_000)
   try {
     const jinaUrl = `https://r.jina.ai/${clean}`
-    let res = await fetch(jinaUrl, { signal: controller.signal, headers: { Accept: 'text/plain,*/*' } })
-    let text = res.ok ? await res.text() : ''
+    const errors = []
+    let text = ''
+    try {
+      const res = await fetch(jinaUrl, { signal: controller.signal, headers: { Accept: 'text/plain,*/*' } })
+      text = res.ok ? await res.text() : ''
+      if (!res.ok) errors.push(`Jina 抓取失败：HTTP ${res.status}`)
+    } catch (err) {
+      errors.push(`Jina 抓取失败：${err?.message || err}`)
+    }
     if (!text || text.length < 120) {
-      res = await fetch(clean, { signal: controller.signal, headers: { 'User-Agent': 'Mozilla/5.0 BailongmaKnowledgeBot/1.0' } })
-      const html = res.ok ? await res.text() : ''
-      text = html
-        .replace(/<script[\s\S]*?<\/script>/giu, ' ')
-        .replace(/<style[\s\S]*?<\/style>/giu, ' ')
-        .replace(/<[^>]+>/g, ' ')
-        .replace(/&nbsp;/g, ' ')
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
+      try {
+        const res = await fetch(clean, { signal: controller.signal, headers: { 'User-Agent': 'Mozilla/5.0 BailongmaKnowledgeBot/1.0' } })
+        const html = res.ok ? await res.text() : ''
+        if (!res.ok) errors.push(`原始链接抓取失败：HTTP ${res.status}`)
+        text = html
+          .replace(/<script[\s\S]*?<\/script>/giu, ' ')
+          .replace(/<style[\s\S]*?<\/style>/giu, ' ')
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/&nbsp;/g, ' ')
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+      } catch (err) {
+        errors.push(`原始链接抓取失败：${err?.message || err}`)
+      }
     }
     const body = normalizeText(text)
-    if (!body || body.length < 40) throw new Error('链接没有可解析正文，可能需要登录或被反爬限制')
+    if (!body || body.length < 40) {
+      const detail = errors.length ? `（${errors.join('；')}）` : ''
+      throw new Error(`链接没有可解析正文，可能需要登录或被反爬限制${detail}`)
+    }
     return body
   } finally {
     clearTimeout(timer)
