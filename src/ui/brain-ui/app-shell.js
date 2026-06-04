@@ -836,6 +836,25 @@ const createSettingsModal = () => `
 
         <!-- ── 微信群助手 tab ── -->
         <div class="settings-tab" data-tab="wechat-groups">
+          <div class="wechaty-settings-layout">
+            <aside class="wechaty-subnav" aria-label="微信群助手二级菜单">
+              <div class="wechaty-subnav-head">
+                <b>微信群助手</b>
+                <span>按模块快速定位</span>
+              </div>
+              <nav>
+                <a href="#wechaty-connection-section"><em>01</em><span><b>连接与回复群</b><small>登录、群选择、主动回复</small></span></a>
+                <a href="#wechaty-capability-section"><em>02</em><span><b>回复能力</b><small>管理员、屏蔽、斗图、性格</small></span></a>
+                <a href="#wechaty-data-section"><em>03</em><span><b>记忆与战报</b><small>群记忆、统计、记录库</small></span></a>
+                <a href="#wechaty-hotspot-panel"><em>04</em><span><b>舆情推送</b><small>平台、关键词、接收群</small></span></a>
+                <a href="#wechaty-knowledge-section"><em>05</em><span><b>知识库连接</b><small>本地记忆、Honcho 后端</small></span></a>
+                <a href="#wechaty-security-section"><em>06</em><span><b>安全边界</b><small>微信群强制拒绝规则</small></span></a>
+              </nav>
+              <div class="wechaty-subnav-note">
+                参考插件化、统一配置和定时任务中心的演进方向，先把现有模块拆成可定位入口。
+              </div>
+            </aside>
+            <div class="wechaty-settings-content">
           <div class="settings-section wechaty-group-settings">
             <div class="wechaty-console-hero">
               <div>
@@ -844,12 +863,6 @@ const createSettingsModal = () => `
                 <p class="settings-hint">按下面 4 步配置：登录微信 → 选择允许 @ 回复的群 → 按需开启能力 → 保存。没 @ 的群消息只归档/统计，不会打扰。</p>
               </div>
               <div class="settings-platform-status" id="wechaty-duty-status">○ 未连接</div>
-            </div>
-            <div class="wechaty-flow-rail" aria-label="微信群助手配置流程">
-              <a class="active" href="#wechaty-connection-section"><em>01</em><b>连接与回复群</b><span>扫码、在线状态、@ 回复群</span></a>
-              <a href="#wechaty-capability-section"><em>02</em><b>回复能力</b><span>管理员、斗图、性格</span></a>
-              <a href="#wechaty-data-section"><em>03</em><b>记忆与战报</b><span>群记忆、统计、图片战报</span></a>
-              <a href="#wechaty-knowledge-section"><em>04</em><b>知识库/安全</b><span>服务连接与黑名单</span></a>
             </div>
             <section class="wechaty-feature-section connection" id="wechaty-connection-section">
               <div class="wechaty-feature-heading">
@@ -1326,7 +1339,7 @@ const createSettingsModal = () => `
             </section>
           </div>
           <div class="settings-section wechaty-knowledge-section" id="wechaty-knowledge-section">
-            <div class="wechaty-feature-heading compact"><span>04</span><div><b>知识库连接</b><small>默认使用 App 内置本地记忆；Honcho 只作为可选外部同步后端。</small></div></div>
+            <div class="wechaty-feature-heading compact"><span>05</span><div><b>知识库连接</b><small>默认使用 App 内置本地记忆；Honcho 只作为可选外部同步后端。</small></div></div>
             <div class="settings-section-label">群知识库后端</div>
             <div class="settings-platform-status" id="wechaty-honcho-status">○ 未启用</div>
             <p class="settings-hint">默认无需 Docker：群消息、群长期记忆、成员记忆和语义检索都会写入 App 本机数据库。需要连接外部 Honcho 时再启用下面开关。</p>
@@ -1363,11 +1376,13 @@ const createSettingsModal = () => `
               <span class="settings-feedback" id="honcho-feedback"></span>
             </div>
           </div>
-          <div class="settings-section wechaty-security-section">
-            <div class="wechaty-feature-heading compact danger"><span>05</span><div><b>安全边界</b><small>微信群入口的强制拒绝规则。</small></div></div>
+          <div class="settings-section wechaty-security-section" id="wechaty-security-section">
+            <div class="wechaty-feature-heading compact danger"><span>06</span><div><b>安全边界</b><small>微信群入口的强制拒绝规则。</small></div></div>
             <div class="settings-section-label">安全黑名单</div>
             <p class="settings-hint">微信群入口默认禁止让大模型执行危险电脑操作。命中后会直接拒绝，只允许解释风险或给安全手动步骤。不包含逆向和成人内容过滤。</p>
             <div class="wechaty-guard-list" id="wechaty-guard-list"></div>
+          </div>
+            </div>
           </div>
         </div>
 
