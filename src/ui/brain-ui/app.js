@@ -2165,6 +2165,21 @@ function initTTSSettings() {
   const wechatyDigestDailyTime = document.getElementById("wechaty-digest-daily-time");
   const wechatyDigestGroupList = document.getElementById("wechaty-digest-group-list");
   const wechatyDigestGroupCount = document.getElementById("wechaty-digest-group-count");
+  const wechatyHotspotEnabled = document.getElementById("wechaty-hotspot-enabled");
+  const wechatyHotspotInterval = document.getElementById("wechaty-hotspot-interval");
+  const wechatyHotspotMode = document.getElementById("wechaty-hotspot-mode");
+  const wechatyHotspotTopN = document.getElementById("wechaty-hotspot-topn");
+  const wechatyHotspotRankRise = document.getElementById("wechaty-hotspot-rank-rise");
+  const wechatyHotspotDedupeHours = document.getElementById("wechaty-hotspot-dedupe-hours");
+  const wechatyHotspotKeywords = document.getElementById("wechaty-hotspot-keywords");
+  const wechatyHotspotGroupList = document.getElementById("wechaty-hotspot-group-list");
+  const wechatyHotspotGroupCount = document.getElementById("wechaty-hotspot-group-count");
+  const wechatyHotspotStatus = document.getElementById("wechaty-hotspot-status");
+  const wechatyHotspotResult = document.getElementById("wechaty-hotspot-result");
+  const wechatySaveHotspotBtn = document.getElementById("wechaty-save-hotspot-btn");
+  const wechatyHotspotCheckBtn = document.getElementById("wechaty-hotspot-check-btn");
+  const wechatyHotspotNotifyBtn = document.getElementById("wechaty-hotspot-notify-btn");
+  const wechatyHotspotFeedback = document.getElementById("wechaty-hotspot-feedback");
   const wechatyRankMessage = document.getElementById("wechaty-rank-message");
   const wechatyRankImage = document.getElementById("wechaty-rank-image");
   const wechatyRankEmoji = document.getElementById("wechaty-rank-emoji");
@@ -3042,6 +3057,7 @@ function initTTSSettings() {
       setTimeout(() => loadWechatyActiveStats({ silent: true }), 500);
       setTimeout(() => loadWechatyAdminMembers({ silent: true }), 700);
       setTimeout(() => loadWechatyKnownGroups({ silent: true }), 900);
+      setTimeout(() => loadWechatyHotspotSettings({ silent: true }), 1100);
       for (const [statusId, keys] of Object.entries(SOCIAL_PLATFORM_STATUS)) {
         const el = document.getElementById(statusId);
         if (!el) continue;
@@ -3083,6 +3099,9 @@ function initTTSSettings() {
   let wechatyAdminMemberCache = [];
   let wechatyDigestConfigCache = {};
   let wechatyDigestSelectedGroups = new Set();
+  let wechatyHotspotConfigCache = {};
+  let wechatyHotspotStatusCache = {};
+  let wechatyHotspotSelectedGroups = new Set();
   let wechatyReportPreviewUrl = '';
   let wechatyRecordsOffset = 0;
   let wechatyRecordsHasMore = false;
@@ -3480,6 +3499,203 @@ function initTTSSettings() {
       .filter(cb => cb.checked)
       .map(cb => String(cb.dataset.groupId || cb.value || "").trim())
       .filter(Boolean));
+  }
+
+  function getWechatyHotspotCandidateGroups() {
+    return getWechatyDigestCandidateGroups();
+  }
+
+  function isWechatyHotspotGroupSelected(group = {}) {
+    const topic = String(group.topic || "").trim();
+    const stable = groupDigestId(group);
+    const requestId = memoryGroupRequestId(group);
+    return wechatyHotspotSelectedGroups.has(stable)
+      || wechatyHotspotSelectedGroups.has(requestId)
+      || (!!topic && wechatyHotspotSelectedGroups.has(`wechaty:${topic}`));
+  }
+
+  function syncWechatyHotspotSelectedGroupsFromDom() {
+    if (!wechatyHotspotGroupList) return;
+    const checkboxes = [...wechatyHotspotGroupList.querySelectorAll(".wechaty-hotspot-group-checkbox")];
+    if (!checkboxes.length) return;
+    wechatyHotspotSelectedGroups = new Set(checkboxes
+      .filter(cb => cb.checked)
+      .map(cb => String(cb.dataset.groupId || cb.value || "").trim())
+      .filter(Boolean));
+  }
+
+  function updateWechatyHotspotGroupCount() {
+    syncWechatyHotspotSelectedGroupsFromDom();
+    if (!wechatyHotspotGroupCount) return;
+    const selected = getWechatyHotspotCandidateGroups().filter(group => isWechatyHotspotGroupSelected(group));
+    wechatyHotspotGroupCount.textContent = selected.length
+      ? `已选择 ${selected.length} 个群`
+      : "未选择，不会推送";
+  }
+
+  function formatWechatyHotspotStatus(status = {}, config = wechatyHotspotConfigCache) {
+    const enabled = config.enabled === true;
+    const scheduler = status.scheduler_running ? "调度器已启动" : "调度器未启动";
+    const last = status.last_check_at ? `上次检查 ${formatWechatyTime(status.last_check_at)}` : "尚未检查";
+    const next = status.next_check_at ? `下次 ${formatWechatyTime(status.next_check_at)}` : "未安排下次检查";
+    const error = status.last_error ? `；错误：${status.last_error}` : "";
+    return `${enabled ? "已启用" : "已关闭"} · ${scheduler} · ${last} · ${next}${error}`;
+  }
+
+  function renderWechatyHotspotGroups() {
+    if (!wechatyHotspotGroupList) return;
+    const groups = getWechatyHotspotCandidateGroups();
+    if (!groups.length) {
+      wechatyHotspotGroupList.innerHTML = '<div class="wechaty-empty">还没有识别到微信群。登录微信或收到群消息后会自动出现。</div>';
+      updateWechatyHotspotGroupCount();
+      return;
+    }
+    wechatyHotspotGroupList.innerHTML = groups.map(group => {
+      const gid = groupDigestId(group);
+      const checked = isWechatyHotspotGroupSelected(group) ? " checked" : "";
+      const stale = group.stale ? " stale" : "";
+      const stat = group.selected ? "已允许 @ 回复，可接收舆情" : (group.knownOnly ? "已识别/有记录，未开启 @ 回复" : "未开启 @ 回复");
+      const requestId = memoryGroupRequestId(group);
+      return `<label class="wechaty-digest-group-item${stale}" title="${escapeHtml(gid)}">
+        <input class="wechaty-hotspot-group-checkbox" type="checkbox" value="${escapeHtml(gid)}" data-group-id="${escapeHtml(gid)}" data-request-id="${escapeHtml(requestId)}" data-group-name="${escapeHtml(group.topic || "")}"${checked}>
+        <span><b>${escapeHtml(group.topic || "未命名群")}</b><em>${escapeHtml(stat)}</em></span>
+      </label>`;
+    }).join("");
+    updateWechatyHotspotGroupCount();
+  }
+
+  function applyWechatyHotspotConfig(config = {}, status = {}) {
+    wechatyHotspotConfigCache = { ...config };
+    wechatyHotspotStatusCache = { ...status };
+    wechatyHotspotSelectedGroups = new Set((config.selectedGroups || config.selected_groups || []).map(v => String(v || "").trim()).filter(Boolean));
+    if (wechatyHotspotEnabled) wechatyHotspotEnabled.checked = config.enabled === true;
+    if (wechatyHotspotInterval) wechatyHotspotInterval.value = String(config.intervalMinutes || 10);
+    if (wechatyHotspotMode) wechatyHotspotMode.value = config.notifyMode || "changes";
+    if (wechatyHotspotTopN) wechatyHotspotTopN.value = String(config.topN || 10);
+    if (wechatyHotspotRankRise) wechatyHotspotRankRise.value = String(config.rankRiseThreshold || 5);
+    if (wechatyHotspotDedupeHours) wechatyHotspotDedupeHours.value = String(config.dedupeHours || 6);
+    if (wechatyHotspotKeywords) wechatyHotspotKeywords.value = (config.keywords || []).join("\n");
+    const platforms = new Set(config.platforms || ["douyin", "xiaohongshu", "wechat", "weibo"]);
+    document.querySelectorAll(".wechaty-hotspot-platform").forEach(input => {
+      input.checked = platforms.has(input.value);
+    });
+    if (wechatyHotspotStatus) wechatyHotspotStatus.textContent = formatWechatyHotspotStatus(status, config);
+    renderWechatyHotspotGroups();
+  }
+
+  function collectWechatyHotspotConfig() {
+    syncWechatyHotspotSelectedGroupsFromDom();
+    const platforms = [...document.querySelectorAll(".wechaty-hotspot-platform")]
+      .filter(input => input.checked)
+      .map(input => input.value)
+      .filter(Boolean);
+    const keywords = String(wechatyHotspotKeywords?.value || "")
+      .split(/[\n,，;；]+/u)
+      .map(item => item.trim())
+      .filter(Boolean);
+    return {
+      enabled: !!wechatyHotspotEnabled?.checked,
+      intervalMinutes: Number(wechatyHotspotInterval?.value || 10),
+      notifyMode: wechatyHotspotMode?.value || "changes",
+      selectedGroups: [...wechatyHotspotSelectedGroups],
+      platforms,
+      keywords,
+      topN: Number(wechatyHotspotTopN?.value || 10),
+      rankRiseThreshold: Number(wechatyHotspotRankRise?.value || 5),
+      dedupeHours: Number(wechatyHotspotDedupeHours?.value || 6),
+    };
+  }
+
+  function renderWechatyHotspotResult(data = {}) {
+    if (!wechatyHotspotResult) return;
+    if (!data || !Object.keys(data).length) {
+      wechatyHotspotResult.textContent = "手动检查结果会显示在这里。";
+      return;
+    }
+    const events = Array.isArray(data.events) ? data.events : [];
+    const notify = data.notify || {};
+    const lines = [
+      data.ok ? `检查完成：发现 ${events.length} 条舆情事件` : `检查失败：${data.error || "未知错误"}`,
+      data.checked_at ? `时间：${formatWechatyTime(data.checked_at, true)}` : "",
+      data.baseline_only ? "首次检查只建立基线，不自动推送。" : "",
+      notify.skipped ? `通知：跳过（${notify.reason || "无通知"}）` : "",
+      notify.groups?.length ? `通知群：${notify.groups.map(group => `${group.groupName || group.roomId}${group.ok ? "" : "（失败）"}`).join("、")}` : "",
+      ...events.slice(0, 8).map(event => `${event.platformLabel || event.platform} #${event.rank} ${event.title}`),
+    ].filter(Boolean);
+    wechatyHotspotResult.textContent = lines.join("\n") || "没有检测到变化。";
+  }
+
+  async function loadWechatyHotspotSettings({ silent = true } = {}) {
+    if (!wechatyHotspotStatus && !wechatyHotspotGroupList) return;
+    try {
+      const data = await fetch(`${API}/settings/hotspot-alerts`).then(r => r.json());
+      if (data.ok) {
+        applyWechatyHotspotConfig(data.config || {}, data.status || {});
+      } else if (!silent) {
+        showFeedback(wechatyHotspotFeedback || wechatyDutyFeedback, data.error || "读取舆情推送设置失败", true);
+      }
+    } catch {
+      if (!silent) showFeedback(wechatyHotspotFeedback || wechatyDutyFeedback, "读取舆情推送设置请求失败", true);
+    }
+  }
+
+  async function saveWechatyHotspotSettings({ silent = false } = {}) {
+    if (!wechatySaveHotspotBtn) return;
+    wechatySaveHotspotBtn.disabled = true;
+    try {
+      const payload = collectWechatyHotspotConfig();
+      const res = await fetch(`${API}/settings/hotspot-alerts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        applyWechatyHotspotConfig(data.config || payload, data.status || {});
+        const count = (data.config?.selectedGroups || payload.selectedGroups || []).length;
+        if (!silent) showFeedback(wechatyHotspotFeedback || wechatyDutyFeedback, count ? `舆情推送设置已保存，已选择 ${count} 个群` : "已保存：未选择群组，所以不会推送");
+      } else if (!silent) {
+        showFeedback(wechatyHotspotFeedback || wechatyDutyFeedback, data.error || "保存失败", true);
+      }
+    } catch {
+      if (!silent) showFeedback(wechatyHotspotFeedback || wechatyDutyFeedback, "保存舆情推送设置失败", true);
+    } finally {
+      wechatySaveHotspotBtn.disabled = false;
+    }
+  }
+
+  async function runWechatyHotspotCheck({ notify = false } = {}) {
+    await saveWechatyHotspotSettings({ silent: true });
+    const btn = notify ? wechatyHotspotNotifyBtn : wechatyHotspotCheckBtn;
+    if (btn) btn.disabled = true;
+    if (wechatyHotspotResult) wechatyHotspotResult.textContent = notify ? "正在检查舆情并推送微信群…" : "正在检查舆情变化…";
+    try {
+      const res = await fetch(`${API}/settings/hotspot-alerts/check`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notify, forceNotify: notify }),
+      });
+      const data = await res.json();
+      if (data.config || data.status) applyWechatyHotspotConfig(data.config || wechatyHotspotConfigCache, data.status || {});
+      renderWechatyHotspotResult(data);
+      if (data.ok) {
+        const failedNotify = notify && data.notify && data.notify.ok === false && !data.notify.skipped;
+        const skippedNotify = notify && data.notify?.skipped;
+        const message = failedNotify
+          ? `检查完成，但通知未发送：${data.notify.reason || "没有可通知群"}`
+          : skippedNotify
+            ? `检查完成，通知跳过：${data.notify.reason || "无变化"}`
+            : notify ? "检查完成，已按配置推送微信群" : "检查完成";
+        showFeedback(wechatyHotspotFeedback || wechatyDutyFeedback, message, failedNotify);
+      } else {
+        showFeedback(wechatyHotspotFeedback || wechatyDutyFeedback, data.error || "检测失败", true);
+      }
+    } catch {
+      if (wechatyHotspotResult) wechatyHotspotResult.textContent = "舆情检查请求失败";
+      showFeedback(wechatyHotspotFeedback || wechatyDutyFeedback, "舆情检查请求失败", true);
+    } finally {
+      if (btn) btn.disabled = false;
+    }
   }
 
   function fitWechatyReportPreviewFrames() {
@@ -5242,6 +5458,7 @@ function initTTSSettings() {
     renderWechatyRooms();
     renderWechatyMemoryGroups();
     renderWechatyDigestGroups();
+    renderWechatyHotspotGroups();
     loadWechatyKnownGroups({ silent: true });
   }
 
@@ -5270,6 +5487,7 @@ function initTTSSettings() {
     updateWechatySelectedCount();
     renderWechatyMemoryGroups();
     renderWechatyDigestGroups();
+    renderWechatyHotspotGroups();
   }
 
   function updateWechatySelectedCount() {
@@ -5356,6 +5574,7 @@ function initTTSSettings() {
         wechatyKnownGroupsCache = data.groups;
         renderWechatyMemoryGroups();
         renderWechatyDigestGroups();
+        renderWechatyHotspotGroups();
       }
     } catch {
       if (!silent) showFeedback(wechatyDutyFeedback, '读取已识别群失败', true);
@@ -5706,6 +5925,7 @@ function initTTSSettings() {
     updateWechatySelectedCount();
     renderWechatyMemoryGroups();
     renderWechatyDigestGroups();
+    renderWechatyHotspotGroups();
   });
   wechatyAdminIds?.addEventListener("input", () => {
     // 这个框只展示昵称，权限仍由点击成员卡片得到的 sender_id 集合决定。
@@ -5745,6 +5965,27 @@ function initTTSSettings() {
     updateWechatyDigestGroupCount();
     refreshWechatyReportPreview();
   });
+  wechatyHotspotGroupList?.addEventListener("change", (event) => {
+    const cb = event.target?.closest?.(".wechaty-hotspot-group-checkbox");
+    if (!cb) return;
+    const gid = cb.dataset.groupId || cb.value;
+    const groupName = cb.dataset.groupName || "";
+    const requestId = cb.dataset.requestId || (cb.value?.startsWith?.("wechaty:") ? cb.value : `wechaty:${cb.value || groupName}`);
+    if (!gid) return;
+    if (cb.checked) wechatyHotspotSelectedGroups.add(gid);
+    else {
+      wechatyHotspotSelectedGroups.delete(gid);
+      if (groupName) {
+        wechatyHotspotSelectedGroups.delete(groupName);
+        wechatyHotspotSelectedGroups.delete(`wechaty:${groupName}`);
+      }
+      wechatyHotspotSelectedGroups.delete(requestId);
+    }
+    updateWechatyHotspotGroupCount();
+  });
+  wechatySaveHotspotBtn?.addEventListener("click", () => saveWechatyHotspotSettings({ silent: false }));
+  wechatyHotspotCheckBtn?.addEventListener("click", () => runWechatyHotspotCheck({ notify: false }));
+  wechatyHotspotNotifyBtn?.addEventListener("click", () => runWechatyHotspotCheck({ notify: true }));
   wechatyReportPreview?.addEventListener("click", (event) => {
     const card = event.target?.closest?.(".wechaty-report-preview-card");
     if (!card) return;

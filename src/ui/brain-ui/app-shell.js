@@ -1222,6 +1222,71 @@ const createSettingsModal = () => `
               </div>
               <div class="wechaty-stats-recent" id="wechaty-stats-recent"></div>
             </div>
+            <div class="wechaty-hotspot-panel" id="wechaty-hotspot-panel">
+              <div class="wechaty-subsection-head">
+                <div>
+                  <div class="wechaty-subsection-title">舆情推送</div>
+                  <p class="settings-hint">监测抖音、小红书、微信热点和微博公开榜单。命中新上榜、排名上升或关键词后，向下方单独勾选的微信群发送聚合提醒。</p>
+                </div>
+                <div class="wechaty-memory-actions">
+                  <button class="settings-save-btn" id="wechaty-hotspot-check-btn" type="button">手动检查</button>
+                  <button class="settings-save-btn primary" id="wechaty-hotspot-notify-btn" type="button">检查并推送</button>
+                </div>
+              </div>
+              <div class="wechaty-hotspot-status" id="wechaty-hotspot-status">舆情推送未加载</div>
+              <div class="wechaty-digest-group-picker wechaty-hotspot-group-picker">
+                <div class="wechaty-digest-group-head">
+                  <div>
+                    <b>选择接收舆情提醒的微信群</b>
+                    <small>这里独立于“@ 回复群组”和“统计/定时总结群组”；只有勾选并保存后，舆情提醒才会发到这些群。</small>
+                  </div>
+                  <span id="wechaty-hotspot-group-count">未选择</span>
+                </div>
+                <div class="wechaty-digest-group-list" id="wechaty-hotspot-group-list">
+                  <div class="wechaty-empty">先登录/恢复微信，或等待程序识别到微信群。</div>
+                </div>
+              </div>
+              <div class="wechaty-hotspot-config">
+                <label class="wechaty-digest-toggle"><input id="wechaty-hotspot-enabled" type="checkbox"><span>启用舆情推送</span></label>
+                <label>检测间隔
+                  <select class="settings-select" id="wechaty-hotspot-interval">
+                    <option value="5">每 5 分钟</option>
+                    <option value="10">每 10 分钟</option>
+                    <option value="30">每 30 分钟</option>
+                    <option value="60">每 1 小时</option>
+                  </select>
+                </label>
+                <label>通知策略
+                  <select class="settings-select" id="wechaty-hotspot-mode">
+                    <option value="changes">只推变化</option>
+                    <option value="all">每次推 Top 榜</option>
+                  </select>
+                </label>
+                <label>TopN
+                  <input class="settings-input" id="wechaty-hotspot-topn" type="number" min="1" max="50" step="1" value="10">
+                </label>
+                <label>上升阈值
+                  <input class="settings-input" id="wechaty-hotspot-rank-rise" type="number" min="1" max="50" step="1" value="5">
+                </label>
+                <label>去重小时
+                  <input class="settings-input" id="wechaty-hotspot-dedupe-hours" type="number" min="1" max="168" step="1" value="6">
+                </label>
+              </div>
+              <div class="wechaty-hotspot-platforms" aria-label="舆情平台">
+                <label><input class="wechaty-hotspot-platform" type="checkbox" value="douyin" checked> 抖音</label>
+                <label><input class="wechaty-hotspot-platform" type="checkbox" value="xiaohongshu" checked> 小红书</label>
+                <label><input class="wechaty-hotspot-platform" type="checkbox" value="wechat" checked> 微信热点</label>
+                <label><input class="wechaty-hotspot-platform" type="checkbox" value="weibo" checked> 微博</label>
+              </div>
+              <label class="wechaty-hotspot-keywords">关键词
+                <textarea class="settings-textarea" id="wechaty-hotspot-keywords" rows="3" placeholder="每行一个关键词，例如：AI、新能源、白龙马"></textarea>
+              </label>
+              <pre class="wechaty-hotspot-result" id="wechaty-hotspot-result">手动检查结果会显示在这里。</pre>
+              <div class="settings-row-action">
+                <button class="settings-save-btn primary" id="wechaty-save-hotspot-btn" type="button">保存舆情推送设置</button>
+                <span class="settings-feedback" id="wechaty-hotspot-feedback"></span>
+              </div>
+            </div>
             </div>
             </section>
           </div>

@@ -13,6 +13,7 @@
 - 群内 @ 助手触发“总结群聊/汇总聊天记录”等自然语言请求时，直接走群聊总结长图渲染和图片发送链路；只有图片生成或发送失败时才回退文本。
 - 群聊总结长图改为 2x 高清 PNG 输出，并新增「干货总结」描述段，基于统计库里的重点/最近消息、话题和活跃成员生成可读摘要，减少只有数据数字的问题。
 - 新增舆情变动微信群推送能力：基于现有热点源监测新上榜、排名上升和关键词命中事件，按配置向 Wechaty 微信群发送聚合通知；默认关闭，并提供设置/手动检测 API。
+- Brain UI 微信群助手设置页新增独立“舆情推送”配置卡片，可选择接收群、监测平台、关键词、检测间隔和触发规则，并支持手动检查或立即推送。
 - 修复群聊总结期望发图片但实际回退成文字的问题：海报渲染器现在会校验 Playwright 默认 Chromium 路径是否真实存在，并在 Windows/macOS/Linux 下扫描系统 Chrome/Edge 与 Playwright 缓存路径，避免 Windows 上默认浏览器路径失效导致 PNG 生成失败。
 - 修复微信群内回复 @ 人偶发不准确的问题：@ 显示名选择改为优先使用当前群昵称、实时解析到的 `roomAlias` 和成员表 `room_alias`，再退到传入昵称、联系人备注或联系人名，避免旧昵称/备注抢占当前群昵称。
 
@@ -24,6 +25,7 @@
 - 通过 `node scripts/test-social-targets.mjs`。
 - 通过 `node scripts/run-electron-node.mjs scripts/test-wechat-video-analysis.mjs`。
 - 分别通过 `node --check src/config.js`、`node --check src/hotspot-alert-monitor.js`、`node --check src/social/index.js`、`node --check src/api.js`，并通过舆情监测器 ES 模块导入验证。
+- 通过 `node --check src/ui/brain-ui/app.js`、`node --check src/ui/brain-ui/app-shell.js` 和 `git diff --check`；`npm run smoke:brain-ui` 因本机 Playwright Chromium 缓存缺失未能启动浏览器。
 
 ## v0.4.92 - 2026-06-03
 

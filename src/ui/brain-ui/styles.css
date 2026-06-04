@@ -4659,6 +4659,7 @@ body.person-card-mode .person-card-panel,
 .wechaty-persona-panel,
 .wechaty-memory-manager,
 .wechaty-stats-panel,
+.wechaty-hotspot-panel,
 .wechaty-knowledge-section {
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.035), 0 18px 44px rgba(0,0,0,0.14);
 }
@@ -4775,10 +4776,14 @@ body.person-card-mode .person-card-panel,
 }
 .wechaty-data-grid > .wechaty-memory-manager,
 .wechaty-data-grid > .wechaty-stats-panel,
+.wechaty-data-grid > .wechaty-hotspot-panel,
 .wechaty-capability-grid > .wechaty-admin-panel,
 .wechaty-capability-grid > .wechaty-meme-panel,
 .wechaty-capability-grid > .wechaty-persona-panel {
   margin-top: 0;
+}
+.wechaty-data-grid > .wechaty-hotspot-panel {
+  grid-column: 1 / -1;
 }
 .wechaty-command-main .wechaty-room-list {
   max-height: clamp(220px, 34vh, 430px);
@@ -4800,7 +4805,8 @@ body.person-card-mode .person-card-panel,
 .wechaty-admin-panel,
 .wechaty-meme-panel,
 .wechaty-memory-manager,
-.wechaty-stats-panel {
+.wechaty-stats-panel,
+.wechaty-hotspot-panel {
   border: 1px solid rgba(255,255,255,0.10);
   border-radius: 18px;
   padding: 14px;
@@ -5496,6 +5502,68 @@ body.person-card-mode .person-card-panel,
 .wechaty-digest-time {
   flex: 0 0 94px;
   width: 94px;
+}
+.wechaty-hotspot-status {
+  border: 1px solid rgba(87,214,255,0.16);
+  border-radius: 12px;
+  padding: 8px 10px;
+  margin: 4px 0 10px;
+  color: #9fffd5;
+  background: rgba(87,214,255,0.055);
+  font-size: 11px;
+}
+.wechaty-hotspot-config,
+.wechaty-hotspot-platforms {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 12px;
+  background: rgba(0,0,0,0.12);
+  margin-bottom: 10px;
+}
+.wechaty-hotspot-config label,
+.wechaty-hotspot-platforms label,
+.wechaty-hotspot-keywords {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink2);
+  font-size: 11px;
+}
+.wechaty-hotspot-keywords {
+  display: grid;
+  align-items: stretch;
+  margin-bottom: 10px;
+}
+.wechaty-hotspot-config .settings-select {
+  flex: 0 0 132px;
+  width: 132px;
+}
+.wechaty-hotspot-config .settings-input {
+  flex: 0 0 76px;
+  width: 76px;
+}
+.wechaty-hotspot-platforms input {
+  accent-color: var(--cool);
+}
+.wechaty-hotspot-result {
+  min-height: 86px;
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 10px;
+  margin: 0 0 10px;
+  color: var(--ink2);
+  background: rgba(0,0,0,0.18);
+  font-size: 11px;
+  line-height: 1.55;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
 }
 .wechaty-stats-scope-select {
   width: 150px;
