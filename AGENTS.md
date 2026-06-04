@@ -1,34 +1,5 @@
 # AGENTS
 
-## 修改记录
-
-- 2026-06-04：准备参考 `xiaoguiwucan/BaiLongma@1a51bfe` 补强微信群图片回复链路：图片先等待识图完成，再进入主动/@ 回复；未解析完成不根据 `[图片]` 占位胡编，并清洗 XML/CDN/msgid 等原始载荷。
-- 2026-06-04：准备把 Skill 渠道卡片里的模型字段恢复为下拉框，保留自定义请求参数 JSON 能力。
-- 2026-06-04：准备修复微信群安全守卫把“我退群了”等日常聊天误判为微信账号/群管理操作；收窄 `退群` 触发条件并补回归测试。
-- 2026-06-04：准备为识图 Skill 渠道增加自定义请求参数 JSON，支持 `req_key` 等中转/上游模型专用参数，并用 `seedream-4-0-250828` 配置验证错误链路。
-- 2026-06-04：准备修复群组知识库 URL 导入失败问题：当 `r.jina.ai` 抓取服务不可达时，不再直接中断解析，而是继续回退到原始 URL 直连抓取，并保留更清晰的失败原因。
-- 2026-06-04：准备开启默认局域网访问能力：将 API 默认监听地址调整为 `0.0.0.0`，并在该模式下允许私有局域网来源访问，支持通过 `192.168.x.x:3721` 打开 Brain UI。
-- 2026-06-04：准备优化 Brain UI 微信群助手设置页信息架构：参考 wechatbot 的管理后台分区思路，为“微信群助手”增加左侧二级菜单，减少长页面滚动成本，并为后续消息插件化、统一配置和定时任务中心预留清晰入口。
-- 2026-06-04：准备为微信群助手增加“屏蔽成员”能力：按微信群成员真实 sender_id 保存黑名单，被屏蔽成员的消息继续入库统计，但无论是否 @ 助手、是否开启主动回复，都不进入回复链路。
-- 2026-06-04：准备新增微信群非 @ 主动回复能力：参考 `xiaoguiwucan/BaiLongma` 的自由回复思路，在本项目 Wechaty 群助手中增加默认关闭的主动回复开关、群级冷却和设置页配置，确保 @ 消息仍然必回，非 @ 消息只在显式开启后进入回复链路。
-- 2026-06-03：补充 `.gitignore`，忽略本地配置、缓存、数据库、虚拟环境和临时产物，避免把运行态文件推到 GitHub。
-- 2026-06-04：修复群聊总结发图回退文字的问题。原因是 `src/social/wechat-group-report-renderer.js` 只在 macOS 路径里找 Playwright Chromium，Windows 下默认可执行文件失效会导致海报渲染失败。已补充 Windows/macOS/Linux 的 Chromium/Edge/Playwright 缓存路径兜底，渲染脚本已验证可输出 PNG。
-- 2026-06-04：修复微信群回复时 @ 人偶发不准确的问题。`src/social/wechaty-duty-group.js` 的 @ 显示名选择已改为当前群昵称/成员表 `room_alias` 优先于传入的旧昵称或联系人备注，并补充回归测试。
-- 2026-06-04：按要求把当前仓库 Git 提交用户配置为 `yideng966 <yideng966@users.noreply.github.com>`，并准备重写历史提交的作者/提交者信息后推送 GitHub。
-- 2026-06-04：参考 `D:\JiangShuai\temp\wechat-chat-summary-image` 重新实现群聊总结图片设计和内容结构。迁移 720px 手机长图、白底、单列布局，并输出时间范围、总量、主要话题、关键时间线、活跃成员和数据限制说明；数据来源继续使用本框架 `getWeChatGroupStats()`，不接入 `wechat-cli`。
-- 2026-06-04：继续对齐 `wechat-chat-summary-image` 的总结内容要求，群聊总结长图的主要话题改为展示关键词出现次数和来自本框架 `important/recent` 消息的证据摘录，避免只输出装饰性话题名。
-- 2026-06-04：群聊总结长图补充明确的「一句话总结」标签，确保输出结构与参考 skill 的最小内容项一致。
-- 2026-06-04：优化群聊总结长图的话题提取逻辑，中文消息改为统计 2-6 字短语候选，提升“主要话题”对重复中文主题的聚合能力。
-- 2026-06-04：为群聊总结长图主要话题增加包含关系去重，避免相邻中文短语重复刷屏。
-- 2026-06-04：修复 Wechaty 群聊先发“我查一下”后不再发送最终答案的问题。`send_message` 成功后仅在内容看起来是最终答复时才提前结束；进度/占位回复会继续工具循环并要求补发最终回复。
-- 2026-06-04：准备把微信群内 @ 助手触发的“总结群聊/汇总聊天记录”等自然语言请求接入群聊总结长图渲染和图片发送链路，图片失败时再回退文本。
-- 2026-06-04：准备优化群聊总结长图清晰度和内容密度：PNG 改为 2x 高清输出，并新增基于当前框架消息证据的「干货总结」描述段，减少纯数字堆叠。
-- 2026-06-04：准备新增舆情变动微信群推送能力：复用 `hotspots.js` 公开热点源，新增独立监测器、配置和手动检查 API，默认关闭，命中规则后通过 Wechaty 群发送聚合通知。
-- 2026-06-04：继续接入舆情变动微信群推送能力：把独立监测器挂到社交启动流程，并补充设置读取、保存和手动检查 API。
-- 2026-06-04：准备在 Brain UI 微信群助手设置页新增独立“舆情推送”配置卡片，支持选择通知群、平台、关键词、检测规则、保存和手动检查。
-- 2026-06-04：准备把舆情推送从纯文本改为图片海报发送：新增舆情海报 HTML/CSS 渲染器，推送时优先发送 PNG，失败再回退文本。
-- 2026-06-04：记录本机网络代理（`192.168.3.5:1082`）与 npm 原生依赖安装的 node PATH 注意事项（见下「环境与网络」）；微信群能力已以插件形式移植到 BaiLongma 仓库（`feature/wechat-group-plugin` 分支）。
-
 ## 环境与网络
 
 - **网络代理**：`https://192.168.3.5:1082`。当 npm / git / 下载等连网失败时使用（`npm config set proxy/https-proxy`，或设 `HTTPS_PROXY` 环境变量）。注意本机 npm registry 已是 `https://registry.npmmirror.com` 国内镜像，通常无需代理即可安装。
@@ -37,6 +8,71 @@
   cmd.exe /c 'set "PATH=D:\Program Files\nodejs;%PATH%" && cd /d <项目目录> && npm install --no-fund --no-audit'
   ```
 
+## 项目开发规范
+
+### 项目定位与边界
+
+- 本项目是 Electron 桌面壳 + 本地 Node Agent 后端 + Brain UI 控制台 + SQLite 记忆库的本地优先单体应用，不是前后端分离 Web 项目。
+- 核心运行链路是 `src/index.js` 主循环：外部消息、语音、社交事件、后台任务和 TICK 心跳进入队列，组装上下文后调用 LLM，再通过工具、社交分发、语音、ACUI 和记忆系统闭环。
+- 默认运行不强依赖 Docker/Honcho。`installer/services/honcho/` 是可选外部服务副本；除非任务明确要求维护 Honcho，否则不要把该子项目的贡献规范、Python 工作流或发布规则套到主项目。
+- 本地可写状态应放在运行时 userDir 或根目录运行态文件中，例如 `data/`、`config.json`、`sandbox/`、Wechaty 登录态和日志；打包资源、前端静态资源和种子文件按现有 `src/paths.js` 路径策略处理。
+
+### 目录职责
+
+- `electron/`：Electron 主进程、窗口、日志、自动更新、后端 bootstrap。
+- `src/index.js`：Agent 后端主入口和意识循环，涉及抢占、watchdog、队列和 turn 收尾时必须谨慎验证。
+- `src/api.js`：原生 HTTP API、SSE、WebSocket 和静态资源服务；当前没有 Express/Koa，新增接口应沿用现有原生路由风格，除非明确重构。
+- `src/db.js`：SQLite 初始化和幂等迁移。项目当前没有独立 migration 框架，新增字段应使用 `CREATE TABLE IF NOT EXISTS`、`PRAGMA table_info` 或 try/catch 包裹的幂等迁移。
+- `src/llm.js`、`src/config.js`：OpenAI 兼容 LLM 调用、多模型 profile、failover、API Key 存储和连通性检测。任何涉及第三方 SDK/API 签名的改动必须先查当前依赖或官方文档。
+- `src/capabilities/`：LLM 工具 schema、tool-router 和 executor。新增工具必须同时考虑 schema、路由注入、执行器、审计和安全边界。
+- `src/social/`：社交通道、微信群助手、群统计、群记忆、媒体 Skill 和出站分发。微信群回复必须锁定真实 sender_id，避免昵称、备注或模型输出改错 @ 对象。
+- `src/voice/`：本地 ASR Python 服务、云 ASR、TTS 和语音 turn 隔离。涉及 ASR/TTS 时注意本地模型、WebSocket、voiceTurnId 和打断队列。
+- `src/ui/brain-ui/`：原生 HTML/CSS/JavaScript SPA + Web Components；不要引入 React/Vue/Svelte 等新前端框架。
+- `scripts/`：冒烟测试、回归测试、启动和构建辅助脚本。优先复用已有脚本验证，不要随意新增一次性脚本。
+
+### 运行与验证命令
+
+- 源码运行：`npm start` 启动 Electron；`npm run start:backend` 启动纯后端；`npm run dev` 用 Node watch 启动开发模式。
+- 局域网访问：优先使用 `npm run start:lan` 或 `npm run start:backend:lan`，不要临时改监听地址后忘记回收。
+- 常用冒烟：`npm run smoke:brain-ui`、`npm run smoke:tools`、`npm run smoke:social`。
+- 微信群相关改动优先运行对应回归：`npm run test:wechat-guard`、`npm run test:wechat-record-all`、`npm run test:wechat-multi-mention-quote-image`、`npm run test:wechat-admin-priority`、`npm run test:wechat-file-image-memory`、`npm run test:wechat-video-analysis`、`npm run test:wechat-member-memory`、`npm run test:wechaty-offline-qr-notify`。
+- 小范围 JS 改动至少对触及文件运行 `node --check <file>`；涉及 Electron 环境或 native 依赖的脚本优先使用 `scripts/run-electron-node.mjs`。
+- 修改后必须做最小必要验证；如果因缺少 Playwright Chromium、微信登录态、API Key、网络或平台能力无法验证，要在回复中明确说明未验证项和原因。
+
+### 文档与版本纪律
+
+- 所有重要版本改动应写入 `CHANGELOG.md`，内容包含版本号/日期、改动内容、改变原因、验证结果和部署/备份注意事项。
+- 面向发布的说明同步维护 `RELEASE.md`；README 的“版本更新记录”只保留摘要和入口，不应堆入完整 release 细节。
+- 所有变更历史统一维护在 `CHANGELOG.md`，不要在 `AGENTS.md` 中新增“修改记录”或变更历史条目。
+- README 仅保留版本摘要、项目说明和文档入口；具体变更历史以 `CHANGELOG.md` 为准。
+- 新增功能时必须同步更新 `README.md` 中对应的能力说明、模块说明、运行方式、API 或验证入口，确保 README 与当前代码能力一致。
+- 不要把 `ACI-理念文档.md`、`ACUI-Phase1-设计稿.md` 里的未来设计当成已落地强制规则；只有代码和当前说明已支持的能力才可作为实现依据。
+
+### 数据、安全与隐私
+
+- `.env`、`config.json`、`data/`、Wechaty 登录态、日志、`.playwright-mcp/`、本地模型、声纹数据和个人运行态文件不得提交或打包进公开产物。
+- API Key 只能本地保存，前端/API 只显示已配置状态或尾号，不返回明文。
+- 微信群普通成员默认不能要求读取/列出本机文件、外传密钥隐私、执行命令、控制电脑、账号资金操作、群管理和群发刷屏。管理员绕过只基于设置页保存的精确 sender_id 或稳定身份，不接受昵称或自称。
+- 微信群媒体发送只允许程序生成的临时文件、公开 HTTPS 图片/GIF 或已入库媒体；禁止按用户给出的本机路径、`file://`、桌面/相册路径外发文件。
+- 群消息默认可入库统计，但回复链路必须遵守当前群配置、屏蔽成员、主动回复开关、冷却和 @ 必回规则。
+
+### 前端与 ACUI
+
+- Brain UI 使用原生 Web Components 和普通 JS/CSS，保持现有信息架构与设置页模式，避免引入新框架或大规模视觉重写。
+- ACUI 卡片优先级：已有注册组件优先；静态展示用 `inline-template`；只有复杂内部状态、动画、Canvas 或持续交互才使用 `inline-script`。
+- `inline-template` 只支持 `${字段名}` 和 `data-acui-each="字段名"`，不要在模板里写表达式、点路径、数组 map 或 JS 逻辑；复杂数据先在 props 中拍平。
+- ACUI 组件不要直接 `fetch`、`import`、操作全局 `document` 或写 `localStorage`；用户操作通过 `acui:action` 回传，由 Agent/后端决定业务动作。
+- UI 卡片不是默认输出方式。只有结构化信息、媒体、可变状态或用户需要“一眼看懂”的内容才使用卡片。
+
+### 构建与发布
+
+- Windows 打包历史上容易受旧 `dist/`、Playwright 和 native rebuild 影响；构建前可清理旧产物，必要时使用 `NODE_OPTIONS=--max-old-space-size=4096`。
+- `package.json` 当前 `build.npmRebuild=false`，更换 Electron 版本或 native 依赖后需要手动执行 `npm run postinstall`。
+- `better-sqlite3`、语音资源、Playwright/Chromium 路径和打包 `asarUnpack` 相关改动必须结合 `BUILD-NOTES.md` 和实际平台验证。
+- macOS 发布需要 DMG、ZIP、两个 blockmap 和 `latest-mac.yml`；发布前应在干净用户环境验证 `/status`、首次激活、Brain UI、无旧群缓存/本地数据泄漏。
+- 完整安装包不能静默携带用户 API Key、微信登录态、macOS 权限或外部 CLI 登录态；这些必须作为首次设置或检查项呈现。
+
 ## 规则
 
-- 后续每次涉及代码或配置修改时，先在这里补一条简短修改记录，再继续提交。
+- 后续每次涉及代码、配置或项目规范修改时，变更历史一律写入 `CHANGELOG.md`，不要写入 `AGENTS.md`。
+- Git 提交信息必须使用中文，避免使用英文提交注释。
