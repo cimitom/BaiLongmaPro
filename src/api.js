@@ -54,7 +54,7 @@ const BRAIN_UI_ASSET_ROOT = paths.brainUiAssetRoot
 const D3_VENDOR_PATH     = path.join(paths.resourcesDir, 'node_modules', 'd3', 'dist', 'd3.min.js')
 const SANDBOX_PATH       = paths.sandboxDir
 const DEFAULT_AGENT_NAME = '小白龙'
-const DEFAULT_API_HOST = '127.0.0.1'
+const DEFAULT_API_HOST = '0.0.0.0'
 
 // card.action signals that are lifecycle/system-internal — stored in DB for passive injector use only, not pushed to the agent queue
 const SILENT_CARD_ACTIONS = new Set([
@@ -69,7 +69,11 @@ function getApiHost() {
 }
 
 function isLanAccessEnabled() {
-  return /^(1|true|yes|on)$/i.test(String(globalThis.process?.env?.BAILONGMA_ALLOW_LAN || '').trim())
+  const configured = String(globalThis.process?.env?.BAILONGMA_ALLOW_LAN || '').trim()
+  if (configured) return /^(1|true|yes|on)$/i.test(configured)
+
+  const host = getApiHost().toLowerCase()
+  return host === '0.0.0.0' || host === '::' || isPrivateLanAddress(host)
 }
 
 function normalizeRemoteAddress(address = '') {
