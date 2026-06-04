@@ -2,6 +2,20 @@
 
 所有重要版本都需要在这里写清楚：版本号、日期、改动内容、部署/备份注意事项。以后每次升级版本，必须同步更新 `package.json`、`package-lock.json`、`README.md`、`BACKUP-YYYY-MM-DD.md` 和 Brain UI 设置页里的更新说明。
 
+## 未发布 - 2026-06-04
+
+### 修复
+- 修复群聊总结期望发图片但实际回退成文字的问题：海报渲染器现在会校验 Playwright 默认 Chromium 路径是否真实存在，并在 Windows/macOS/Linux 下扫描系统 Chrome/Edge 与 Playwright 缓存路径，避免 Windows 上默认浏览器路径失效导致 PNG 生成失败。
+- 修复微信群内回复 @ 人偶发不准确的问题：@ 显示名选择改为优先使用当前群昵称、实时解析到的 `roomAlias` 和成员表 `room_alias`，再退到传入昵称、联系人备注或联系人名，避免旧昵称/备注抢占当前群昵称。
+
+### 验证
+- 通过群聊战报渲染复现脚本，确认可输出 PNG 图片。
+- 通过 `node scripts/test-wechat-mention-display-name.mjs`。
+- 通过 `node scripts/run-electron-node.mjs scripts/test-wechat-multi-mention-quote-image.mjs`。
+- 通过 `node scripts/run-electron-node.mjs scripts/test-wechat-admin-priority.mjs`，断言通过；Windows 下临时 SQLite 文件清理仍可能打印既有 `EBUSY` 提示。
+- 通过 `node scripts/test-social-targets.mjs`。
+- 通过 `node scripts/run-electron-node.mjs scripts/test-wechat-video-analysis.mjs`。
+
 ## v0.4.92 - 2026-06-03
 
 ### 修复

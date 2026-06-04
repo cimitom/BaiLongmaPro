@@ -482,34 +482,79 @@ function normalizeWechatyMentionTargets(opts = {}) {
   }))
 }
 
-function lookupStoredWechatyMemberName(room, mentionId = '') {
+function lookupStoredWechatyMemberNameParts(room, mentionId = '') {
   const roomId = String(room?.id || '').trim()
   const id = String(mentionId || '').trim()
-  if (!roomId || !id) return ''
+  const empty = { roomAlias: '', displayName: '', contactAlias: '', contactName: '' }
+  if (!roomId || !id) return empty
   try {
     const members = listWeChatGroupMembers({ groupId: `wechaty:${roomId}`, limit: 1000 }).members || []
     const row = members.find(item => String(item.sender_id || '').trim() === id)
-    return normalizeWechatyMentionName(row?.display_name || row?.room_alias || row?.contact_alias || row?.contact_name || '')
+    return {
+      roomAlias: normalizeWechatyMentionName(row?.room_alias || ''),
+      displayName: normalizeWechatyMentionName(row?.display_name || ''),
+      contactAlias: normalizeWechatyMentionName(row?.contact_alias || ''),
+      contactName: normalizeWechatyMentionName(row?.contact_name || ''),
+    }
   } catch {}
-  return ''
+  return empty
+}
+
+function pickWechatyMentionDisplayName({
+  liveRoomAlias = '',
+  roomAlias = '',
+  storedRoomAlias = '',
+  explicitName = '',
+  displayName = '',
+  storedDisplayName = '',
+  directContactName = '',
+  contactAlias = '',
+  contactName = '',
+  storedContactAlias = '',
+  storedContactName = '',
+} = {}) {
+  const candidates = [
+    liveRoomAlias,
+    roomAlias,
+    storedRoomAlias,
+    explicitName,
+    displayName,
+    storedDisplayName,
+    directContactName,
+    contactAlias,
+    contactName,
+    storedContactAlias,
+    storedContactName,
+  ]
+  return candidates.map(normalizeWechatyMentionName).find(Boolean) || ''
 }
 
 async function resolveWechatyMentionDisplayName(room, contact, mentionId = '', explicitName = '') {
-  const candidates = []
-  pushWechatyCandidate(candidates, explicitName)
   // 群内显示名优先。这里是最终发出去的 @ 文本，必须是群里可见的昵称，而不是内部 sender_id。
-  try { pushWechatyCandidate(candidates, await room?.alias?.(contact)) } catch {}
-  try { pushWechatyCandidate(candidates, contact?.name?.()) } catch {}
+  let liveRoomAlias = ''
+  let directContactName = ''
+  let parts = null
+  try { liveRoomAlias = await room?.alias?.(contact) || '' } catch {}
+  try { directContactName = contact?.name?.() || '' } catch {}
   try {
-    const parts = contact
+    parts = contact
       ? await resolveWechatyMemberNameParts(room, contact, mentionId)
       : await resolveWechatyMemberNamePartsFromId(room, mentionId, { hydrate: true })
-    pushWechatyCandidate(candidates, parts.roomAlias)
-    pushWechatyCandidate(candidates, parts.displayName)
-    pushWechatyCandidate(candidates, parts.contactName)
   } catch {}
-  pushWechatyCandidate(candidates, lookupStoredWechatyMemberName(room, mentionId))
-  return candidates.map(normalizeWechatyMentionName).find(Boolean) || ''
+  const stored = lookupStoredWechatyMemberNameParts(room, mentionId)
+  return pickWechatyMentionDisplayName({
+    liveRoomAlias,
+    roomAlias: parts?.roomAlias || '',
+    storedRoomAlias: stored.roomAlias,
+    explicitName,
+    displayName: parts?.displayName || '',
+    storedDisplayName: stored.displayName,
+    directContactName,
+    contactAlias: parts?.contactAlias || '',
+    contactName: parts?.contactName || '',
+    storedContactAlias: stored.contactAlias,
+    storedContactName: stored.contactName,
+  })
 }
 
 async function resolveWechatyMentionTargets(room, mentionTargets = []) {
@@ -2077,6 +2122,12 @@ async function tryDirectVideoAnalysisReply(room, message, text = '', { senderId 
     await sendWechatyDutyGroupMessage(room.id, `视频解析失败：${err?.message || err}`, { mentionId: senderId, mentionName: senderName })
     return true
   }
+}
+
+export const __wechatyMentionTestInternals = {
+  normalizeWechatyMentionName,
+  pickWechatyMentionDisplayName,
+  buildManualWechatMentionText,
 }
 
 export const __wechatyVideoTestInternals = {
