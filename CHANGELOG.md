@@ -18,6 +18,7 @@
 - Brain UI 的“微信群助手”设置页新增左侧二级菜单，按连接与回复群、回复能力、记忆战报、舆情推送、知识库连接和安全边界拆分入口，减少长页面滚动查找成本。
 
 ### 修复
+- 修复知识库正常入库但检索不到的问题：云 embedding 配置存在但调用失败时会回退本地 hash embedding，避免分块以空向量入库；群知识检索同时支持群 ID 别名和群名兜底，并增加关键词拆分 LIKE 兜底。
 - 修复微信群通过引用图片进行识图时可能识别到非引用图片的问题：引用 XML 中存在 `svrid/msgid/newmsgid` 时只接受消息 ID 强匹配，匹配不到时不再退回最近图片，并提示用户重发原图。
 - 修复舆情推送关闭后后台调度器仍可能保留轮询定时器的问题：保存关闭配置时立即停止 scheduler，且任何直接启动调度器的路径都会在 `enabled=false` 时先清理已有 interval，避免继续占用资源。
 - 修复微信群斗图/表情包偶发裸发图片链接的问题：搜狗神配图 `tugelepic.mse.sogou.com` 这类无 `.jpg/.gif/.webp` 扩展名的图片 API 现在会被识别为公开图片，通过 Wechaty `FileBox.fromUrl` 发送，不再作为普通文本发到群里。
@@ -38,6 +39,7 @@
 - 修复微信群内回复 @ 人偶发不准确的问题：@ 显示名选择改为优先使用当前群昵称、实时解析到的 `roomAlias` 和成员表 `room_alias`，再退到传入昵称、联系人备注或联系人名，避免旧昵称/备注抢占当前群昵称。
 
 ### 验证
+- 通过 `node --check src/knowledge-base.js`、`node --check src/api.js`、`node --check src/social/wechat-groups.js`、`node --check src/ui/brain-ui/app.js`、`node --check scripts/test-knowledge-base-search.mjs` 和 `npm run test:knowledge-base-search`。
 - 通过 `node --check src/social/wechat-image-vision.js`、`node --check src/social/wechaty-duty-group.js`、`node --check scripts/test-wechat-multi-mention-quote-image.mjs` 和 `npm run test:wechat-multi-mention-quote-image`。
 - 通过 `node --check src/hotspot-alert-monitor.js`、`node --check src/api.js`、`node --check scripts/test-hotspot-alert-toggle.mjs` 和 `npm run test:hotspot-alert-toggle`。
 - 通过 `node -e "JSON.parse(require('fs').readFileSync('package.json','utf8'))"` 验证 `package.json` JSON 语法。

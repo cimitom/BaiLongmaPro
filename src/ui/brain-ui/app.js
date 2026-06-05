@@ -5566,7 +5566,9 @@ function initTTSSettings() {
     if (!q) { showFeedback(knowledgeFeedback, "请输入测试问题", true); return; }
     const groupId = knowledgeTestGroup?.value || "";
     if (knowledgeTestResults) knowledgeTestResults.innerHTML = '<div class="wechaty-empty">正在模拟召回…</div>';
-    const data = await fetch(`${API}/knowledge/search?q=${encodeURIComponent(q)}&group_id=${encodeURIComponent(groupId)}&limit=10`).then(r => r.json());
+    const selected = knowledgeTestGroup?.selectedOptions?.[0] || null;
+    const groupName = groupId === "all" ? "" : (selected?.dataset?.groupName || selected?.textContent?.replace(/ · .+$/u, "") || "");
+    const data = await fetch(`${API}/knowledge/search?q=${encodeURIComponent(q)}&group_id=${encodeURIComponent(groupId)}&group_name=${encodeURIComponent(groupName)}&limit=10`).then(r => r.json());
     const rows = data.items || [];
     if (knowledgeTestResults) knowledgeTestResults.innerHTML = rows.length ? rows.map(row => `
       <div class="knowledge-test-hit"><b>${escapeHtml(row.title || '未命名')}</b><span>${escapeHtml(row.scope === 'global' ? '全局命中' : '本群命中')} · ${Number(row.score || 0).toFixed(2)}</span><p>${escapeHtml(row.content || '')}</p><small>${escapeHtml(row.source_url || row.file_name || '')}</small></div>`).join("") : '<div class="wechaty-empty">没有命中知识库内容。</div>';

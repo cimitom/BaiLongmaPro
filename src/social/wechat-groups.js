@@ -188,7 +188,7 @@ export async function buildWeChatGroupCommandPrompt({
   const transcript = messages.map(row => `${row.timestamp?.slice(5, 16) || ''} ${row.content}`).join('\n')
   const quickSummary = buildWeChatGroupSummary(messages)
   const memoryContext = await getWeChatGroupMemoryContext({ groupId, senderId, senderName, query: text, limit: 18 })
-  const externalKnowledgeContext = await getExternalKnowledgeContext({ groupId, query: text, limit: 8 })
+  const externalKnowledgeContext = await getExternalKnowledgeContext({ groupId, groupName, query: text, limit: 8 })
   const imageMemoryContext = getWeChatImageMemoryContext({ groupId, query: text, limit: 12 })
   const archiveEvidence = getWeChatGroupArchiveEvidence({ groupId, groupName, query: text, limit: 48, recentLimit: 16, days: 90 })
   const dutyConfig = getWechatyDutyGroupConfig()

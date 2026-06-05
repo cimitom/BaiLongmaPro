@@ -599,6 +599,7 @@ export function startAPI(port = 3721, { getStateSnapshot = null, onActivated = n
         return jsonResponse(res, 200, await searchKnowledge({
           q: url.searchParams.get('q') || '',
           groupId: url.searchParams.get('group_id') || url.searchParams.get('groupId') || '',
+          groupName: url.searchParams.get('group_name') || url.searchParams.get('groupName') || '',
           limit: url.searchParams.get('limit') || 12,
         }))
       } catch (err) { return jsonResponse(res, 500, { ok: false, error: err.message, items: [] }) }

@@ -130,7 +130,10 @@ function cosineSimilarityBuffer(a, b) {
 async function embeddingFor(text = '') {
   try {
     const { computeEmbedding, isEmbeddingConfigured } = await import('./embedding.js')
-    if (isEmbeddingConfigured()) return await computeEmbedding(text)
+    if (isEmbeddingConfigured()) {
+      const embedding = await computeEmbedding(text)
+      if (embedding) return embedding
+    }
   } catch {}
   return localHashEmbeddingBuffer(text)
 }
@@ -381,6 +384,36 @@ function normalizeGroups(groups = []) {
     .filter(g => g.id)
 }
 
+function knowledgeGroupAliases({ groupId = '', groupName = '' } = {}) {
+  const values = new Set()
+  const add = (value = '') => {
+    const raw = String(value || '').trim()
+    if (!raw) return
+    values.add(raw)
+    const withoutWechaty = raw.startsWith('wechaty:') ? raw.slice('wechaty:'.length) : raw
+    const withoutClawbot = raw.startsWith('wechat:clawbot-group:') ? raw.slice('wechat:clawbot-group:'.length) : raw
+    values.add(withoutWechaty)
+    values.add(withoutClawbot)
+    values.add(`wechaty:${withoutWechaty}`)
+    values.add(`wechat:clawbot-group:${withoutClawbot}`)
+  }
+  add(groupId)
+  add(groupName)
+  return [...values].map(v => String(v || '').trim()).filter(Boolean).slice(0, 40)
+}
+
+function knowledgeQueryTerms(query = '') {
+  const compact = compactText(query)
+  const terms = new Set()
+  for (const token of compact.match(/[\u4e00-\u9fa5A-Za-z0-9_-]{2,32}/gu) || []) {
+    const value = token.trim()
+    if (!value || value === compact) continue
+    if (/^(什么|怎么|如何|是否|可以|这个|那个|一下|请问|帮我|告诉我)$/u.test(value)) continue
+    terms.add(value)
+  }
+  return [...terms].slice(0, 8)
+}
+
 export async function parseKnowledgeImport(payload = {}) {
   ensureKnowledgeSchema()
   const groups = normalizeGroups(payload.groups || payload.target?.groups || [])
@@ -497,24 +530,38 @@ export function listKnowledgeSources({ status = '', type = '', groupId = '', q =
   })
 }
 
-export async function searchKnowledge({ q = '', groupId = '', limit = 8 } = {}) {
+export async function searchKnowledge({ q = '', groupId = '', groupName = '', limit = 8 } = {}) {
   ensureKnowledgeSchema()
   const query = compactText(q)
   if (!query) return { ok: false, error: 'missing query', items: [] }
   const db = getDB()
   const params = []
   let scopeSql = "s.enabled=1 AND s.status='active'"
-  if (groupId) {
-    scopeSql += " AND (s.scope='global' OR EXISTS (SELECT 1 FROM knowledge_source_groups g WHERE g.source_id=s.id AND g.group_id=?))"
-    params.push(groupId)
+  if (groupId === '__global__') {
+    scopeSql += " AND s.scope='global'"
+  } else {
+    const groupAliases = knowledgeGroupAliases({ groupId, groupName })
+    if (groupAliases.length) {
+      const placeholders = groupAliases.map(() => '?').join(',')
+      scopeSql += ` AND (s.scope='global' OR EXISTS (SELECT 1 FROM knowledge_source_groups g WHERE g.source_id=s.id AND (g.group_id IN (${placeholders}) OR g.group_name IN (${placeholders}))))`
+      params.push(...groupAliases, ...groupAliases)
+    }
   }
   const like = `%${query.slice(0, 80)}%`
+  const terms = knowledgeQueryTerms(query)
+  const keywordClauses = ['c.content LIKE ? OR s.title LIKE ? OR s.summary LIKE ?']
+  const keywordParams = [like, like, like]
+  for (const term of terms) {
+    const termLike = `%${term.slice(0, 80)}%`
+    keywordClauses.push('c.content LIKE ? OR s.title LIKE ? OR s.summary LIKE ?')
+    keywordParams.push(termLike, termLike, termLike)
+  }
   const keyword = db.prepare(`
     SELECT c.id AS chunk_id, c.content, c.chunk_index, s.*, 1.0 AS score
     FROM knowledge_chunks c JOIN knowledge_sources s ON s.id=c.source_id
-    WHERE ${scopeSql} AND (c.content LIKE ? OR s.title LIKE ? OR s.summary LIKE ?)
+    WHERE ${scopeSql} AND (${keywordClauses.map(clause => `(${clause})`).join(' OR ')})
     ORDER BY s.updated_at DESC LIMIT ?
-  `).all(...params, like, like, like, Math.min(Math.max(Number(limit || 8), 1), 30))
+  `).all(...params, ...keywordParams, Math.min(Math.max(Number(limit || 8), 1), 30))
   const qbuf = await embeddingFor(query)
   const vectorRows = db.prepare(`
     SELECT c.id AS chunk_id, c.content, c.chunk_index, c.embedding, s.*
@@ -534,11 +581,11 @@ export async function searchKnowledge({ q = '', groupId = '', limit = 8 } = {}) 
     const bump = db.prepare(`UPDATE knowledge_sources SET hit_count=hit_count+1, last_hit_at=? WHERE id=?`)
     for (const id of ids) bump.run(now, id)
   }
-  return { ok: true, q: query, group_id: groupId, items }
+  return { ok: true, q: query, group_id: groupId, group_name: groupName, items }
 }
 
-export async function getExternalKnowledgeContext({ groupId = '', query = '', limit = 8 } = {}) {
-  const result = await searchKnowledge({ q: query, groupId, limit })
+export async function getExternalKnowledgeContext({ groupId = '', groupName = '', query = '', limit = 8 } = {}) {
+  const result = await searchKnowledge({ q: query, groupId, groupName, limit })
   const rows = result.items || []
   if (!rows.length) return '<external-knowledge-context>当前群/全局外部知识库没有命中。</external-knowledge-context>'
   const lines = rows.map(row => {
