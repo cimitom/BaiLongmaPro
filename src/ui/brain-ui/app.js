@@ -6015,6 +6015,18 @@ function initTTSSettings() {
     }
   }
 
+  function renderWechatyQr(qr = "") {
+    const value = String(qr || "").trim();
+    if (wechatyQrArea) wechatyQrArea.style.display = value ? "flex" : "none";
+    if (!wechatyQrImg) return;
+    if (value) {
+      wechatyQrImg.src = `${API}/qr.png?data=${encodeURIComponent(value)}&t=${Date.now()}`;
+      wechatyQrImg.alt = "Wechaty 微信登录二维码";
+    } else {
+      wechatyQrImg.removeAttribute("src");
+    }
+  }
+
   function applyWechatyDutyConfig(config = {}, status = {}) {
     if (wechatyDutyEnabled) wechatyDutyEnabled.checked = config.enabled !== false;
     applyWechatyConcurrencyConfig(config || {}, status || {});
@@ -6060,8 +6072,7 @@ function initTTSSettings() {
     const connected = status.online === true && status.status === "connected";
     const offline = status.connection_state === "offline" || status.needs_relogin === true || (["disconnected", "error", "relogin_required", "group_lookup_error", "rooms_stale", "group_not_found"].includes(status.status) && !connected);
     const matchedCount = Object.keys(status.room_ids || {}).filter(k => status.room_ids[k]).length;
-    if (wechatyQrArea) wechatyQrArea.style.display = status.qr ? "flex" : "none";
-    if (wechatyQrImg && status.qr) wechatyQrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(status.qr)}`;
+    renderWechatyQr(status.qr || "");
     if (wechatyLoginSub) {
       const user = status.login_user || status.last_login_user || '';
       const suffix = describeWechatyCachedSuffix(status);
@@ -6489,7 +6500,7 @@ function initTTSSettings() {
           ].map(v => String(v || '').trim()).filter(Boolean));
         }
         if (wechatyDutyEnabled) wechatyDutyEnabled.checked = data.enabled !== false;
-        if (wechatyQrArea) wechatyQrArea.style.display = "none";
+        renderWechatyQr("");
         if (wechatyLoginSub) wechatyLoginSub.textContent = data.online ? `已真实在线：${data.login_user || data.last_login_user || "微信"}。群列表已真实刷新。` : (data.hint || '群列表已刷新，但连接仍在确认中。');
         setWechatyStatus(`${data.online ? "已真实连接" : "正在连接"} · 真实群列表 ${wechatyRoomsCache.length} 个，已接入 ${wechatySelectedGroupNames.size} 个`, data.online === true);
         renderWechatyRooms();
@@ -6768,7 +6779,9 @@ function initTTSSettings() {
     if (!confirm("确定要清空当前微信登录态并重新生成二维码吗？这会让微信群助手重新扫码登录。")) return;
     wechatyReloginBtn.disabled = true;
     if (wechatyStartBtn) wechatyStartBtn.disabled = true;
+    renderWechatyQr("");
     setWechatyStatus("正在清空登录态并生成二维码…", false);
+    if (wechatyLoginSub) wechatyLoginSub.textContent = "正在清空登录态并生成新的登录二维码，请稍候…";
     try {
       const groupNames = collectWechatySelectedRooms();
       const res = await fetch(`${API}/social/wechaty-duty-group/relogin`, {
@@ -6780,7 +6793,9 @@ function initTTSSettings() {
       if (data.ok) {
         showFeedback(wechatyDutyFeedback, "已清空登录态，请扫描新二维码");
         applyWechatyDutyConfig({ enabled: data.enabled, groupNames: data.group_names }, data);
-        setTimeout(() => pollWechatyStatus({ refreshRooms: false }), 1200);
+        [700, 1500, 2800, 4500].forEach(delay => {
+          setTimeout(() => pollWechatyStatus({ refreshRooms: false }), delay);
+        });
       } else showFeedback(wechatyDutyFeedback, data.error || "重新扫码失败", true);
     } catch {
       showFeedback(wechatyDutyFeedback, "重新扫码请求失败", true);
@@ -8005,9 +8020,16 @@ function initTTSSettings() {
       }
       if (d.alert === "offline" || d.needs_relogin || d.connection_state === "offline") {
         setWechatyStatus("已离线 · 缓存群不可用，请重新扫码", false);
-        if (wechatyLoginSub) wechatyLoginSub.textContent = d.hint || "微信助手已离线，无法接收群 @ 消息，请强制重新扫码。";
+        renderWechatyQr(d.qr || "");
+        if (wechatyLoginSub) wechatyLoginSub.textContent = d.hint || "微信助手已离线，缓存群不能自由回复，请强制重新扫码。";
         showFeedback(wechatyDutyFeedback, d.hint || "微信助手已离线，请强制重新扫码", true);
+      } else if (d.status === "qr_ready" && d.qr) {
+        renderWechatyQr(d.qr);
+        setWechatyStatus("等待扫码登录", false);
+        if (wechatyLoginSub) wechatyLoginSub.textContent = "新的登录二维码已生成，请扫码登录；扫码前缓存群不能自由回复。";
+        showFeedback(wechatyDutyFeedback, "新的登录二维码已生成，请扫码登录");
       } else if (d.status === "connected" && d.online) {
+        renderWechatyQr("");
         setWechatyStatus("已真实连接", true);
       }
       return;

@@ -4,6 +4,7 @@ import path from 'path'
 import net from 'net'
 import { fileURLToPath } from 'url'
 import { WebSocketServer } from 'ws'
+import QRCode from 'qrcode'
 import { pushMessage } from './queue.js'
 import { getDB, getConfig, setConfig, insertUISignal, upsertMediaHistory, getMediaHistory, updateLastJarvisConversationContent } from './db.js'
 import { emitEvent, addSSEClient, removeSSEClient, addACUIClient, removeACUIClient, removeActiveUICard, emitUICommand, flushStickyEvents, setStickyEvent } from './events.js'
@@ -196,6 +197,25 @@ function readJsonBody(req) {
   })
 }
 
+async function qrPngResponse(res, rawValue) {
+  const value = String(rawValue || '').trim()
+  if (!value) return jsonResponse(res, 400, { ok: false, error: 'qr data required' })
+  if (value.length > 8192) return jsonResponse(res, 413, { ok: false, error: 'qr data too large' })
+  const png = await QRCode.toBuffer(value, {
+    type: 'png',
+    width: 220,
+    margin: 1,
+    errorCorrectionLevel: 'M',
+    color: { dark: '#000000', light: '#FFFFFF' },
+  })
+  res.writeHead(200, {
+    'Content-Type': 'image/png',
+    'Content-Length': png.length,
+    'Cache-Control': 'no-store, max-age=0',
+  })
+  res.end(png)
+}
+
 function contentTypeFor(filePath) {
   switch (path.extname(filePath).toLowerCase()) {
     case '.js':
@@ -261,6 +281,16 @@ export function startAPI(port = 3721, { getStateSnapshot = null, onActivated = n
     const base = `http://localhost:${port}`
     const url = new URL(req.url, base)
     const origin = req.headers.origin
+
+    // GET /qr.png?data=xxx - render local QR PNG for login flows without external services.
+    if (req.method === 'GET' && url.pathname === '/qr.png') {
+      if (!hasAllowedAccess(req, url)) return jsonResponse(res, 403, { ok: false, error: 'forbidden' })
+      try {
+        return await qrPngResponse(res, url.searchParams.get('data'))
+      } catch (err) {
+        return jsonResponse(res, 500, { ok: false, error: err.message })
+      }
+    }
 
     // GET /social/wechat-clawbot/qr — get current QR code status and URL
     if (req.method === 'GET' && url.pathname === '/social/wechat-clawbot/qr') {
