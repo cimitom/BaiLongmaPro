@@ -2927,6 +2927,11 @@ export async function testSkillModelChannel({ skill = 'imageGeneration', channel
       return { ok: true, status: res.status, latencyMs, message: content.slice(0, 120), channel: { ...normalized, apiKey: undefined, configured: true }, mode: 'vision_chat_completions' }
     }
 
+    if (isVideo) {
+      const { testWechatVideoAnalysisRuntime } = await import('./social/wechat-video-analysis-skill.js')
+      return await testWechatVideoAnalysisRuntime(normalized, { timeoutSeconds: 30 })
+    }
+
     const res = await fetch(`${normalized.baseUrl.replace(/\/$/, '')}/models`, {
       method: 'GET',
       headers: { Authorization: `Bearer ${normalized.apiKey}`, Accept: 'application/json' },

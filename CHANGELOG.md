@@ -5,9 +5,11 @@
 ## v0.4.95 - 2026-06-05
 
 ### 修复
+- 修复微信群视频解析进度提示误触本机文件隐私拦截的问题；视频解析渠道测试改为真实 `chat/completions` + `video_url` 请求，避免 `/models` 可用但实际解析返回 NotFound 时被误判为可用。
 - 修复 GitHub Actions Release workflow 中 Windows 与 macOS 矩阵并发发布同一 tag 时抢建同一个 GitHub Release，导致 macOS 发布阶段出现 `already_exists field=tag_name` 422 错误的问题；发布矩阵现在串行执行，保留单平台手动补发能力。
 
 ### 验证
+- 通过 `node --check src/social/wechat-video-analysis-skill.js`、`node --check src/social/wechaty-duty-group.js`、`node --check src/config.js` 和 `npm run test:wechat-video-analysis`。
 - 通过 PowerShell 检查 `.github/workflows/release.yml` 包含 `max-parallel: 1`。
 - 通过 `node -e "JSON.parse(require('fs').readFileSync('package.json','utf8'))"`。
 - 通过 `git diff --check`。

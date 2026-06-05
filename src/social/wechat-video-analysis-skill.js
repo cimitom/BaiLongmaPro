@@ -15,6 +15,8 @@ const VIDEO_EXT_MIME = new Map([
   ['.avi', 'video/x-msvideo'],
   ['.mkv', 'video/x-matroska'],
 ])
+export const WECHAT_VIDEO_ANALYSIS_PENDING_REPLY = '收到，正在读取这个视频并解析，完成后会把结果发出来。'
+const TINY_MP4_BASE64 = 'AAAAIGZ0eXBpc29tAAACAGlzb21pc28ybXA0MQAAAAhmcmVl'
 
 let lastRun = null
 
@@ -81,6 +83,10 @@ function normalizeRuntime(channel = {}) {
 
 async function callVideoRuntime(runtime, { videoPath = '', mimeType = 'video/mp4', question = '', timeoutSeconds = 90 } = {}) {
   const base64 = fs.readFileSync(videoPath).toString('base64')
+  return callVideoRuntimeWithBase64(runtime, { base64, mimeType, question, timeoutSeconds })
+}
+
+async function callVideoRuntimeWithBase64(runtime, { base64 = '', mimeType = 'video/mp4', question = '', timeoutSeconds = 90, maxTokens = 900 } = {}) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), Math.max(15, Number(timeoutSeconds || 90)) * 1000)
   const started = Date.now()
@@ -95,7 +101,7 @@ async function callVideoRuntime(runtime, { videoPath = '', mimeType = 'video/mp4
       body: JSON.stringify({
         model: runtime.model,
         temperature: 0.2,
-        max_tokens: 900,
+        max_tokens: maxTokens,
         messages: [
           {
             role: 'user',
@@ -123,6 +129,23 @@ async function callVideoRuntime(runtime, { videoPath = '', mimeType = 'video/mp4
     return { ok: false, latencyMs: Date.now() - started, error: err?.name === 'AbortError' ? `视频解析超时（${timeoutSeconds} 秒）` : (err?.message || String(err)), runtime: { provider: runtime.provider, model: runtime.model, baseURL: runtime.baseURL } }
   } finally {
     clearTimeout(timer)
+  }
+}
+
+export async function testWechatVideoAnalysisRuntime(channel = {}, { timeoutSeconds = 30 } = {}) {
+  const runtime = normalizeRuntime(channel)
+  if (!runtime.baseURL || !runtime.model || !runtime.apiKey) return { ok: false, error: 'Base URL、模型和 API Key 不能为空' }
+  const result = await callVideoRuntimeWithBase64(runtime, {
+    base64: TINY_MP4_BASE64,
+    mimeType: 'video/mp4',
+    question: '这是视频解析连通测试。请只回答：视频解析正常',
+    timeoutSeconds,
+    maxTokens: 40,
+  })
+  return {
+    ...result,
+    mode: 'video_chat_completions',
+    channel: { ...channel, apiKey: undefined, configured: true },
   }
 }
 
@@ -192,4 +215,5 @@ export const __internals = {
   cleanupTempDir,
   inferVideoMime,
   callVideoRuntime,
+  callVideoRuntimeWithBase64,
 }

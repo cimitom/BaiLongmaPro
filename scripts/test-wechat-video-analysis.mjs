@@ -8,7 +8,7 @@ process.env.BAILONGMA_USER_DIR = tmp
 process.env.BAILONGMA_RESOURCES_DIR = process.cwd()
 
 const { getDB } = await import('../src/db.js')
-const { setSkillVideoAnalysisConfig } = await import('../src/config.js')
+const { setSkillVideoAnalysisConfig, testSkillModelChannel } = await import('../src/config.js')
 const { getWeChatImageVisionStatus } = await import('../src/social/wechat-image-vision.js')
 const {
   analyzeWechatVideoMessage,
@@ -65,10 +65,18 @@ const fakeMessage = {
   },
 }
 
+const channelTest = await testSkillModelChannel({ skill: 'videoAnalysis', channel: { id: 'video_test' } })
+assert.equal(channelTest.ok, true)
+assert.equal(channelTest.mode, 'video_chat_completions')
+assert.equal(requestBody.model, 'video-test-model')
+assert.equal(requestBody.messages[0].content[1].type, 'video_url')
+assert.match(requestBody.messages[0].content[1].video_url.url, /^data:video\/mp4;base64,/)
+
 assert.equal(isWechatVideoMessageType('video'), true)
 assert.equal(isWechatVideoMessageType(15), true)
 assert.equal(isWechatVideoMessageType('image'), false)
 assert.equal(isWechatVideoAnalysisIntent('@白龙马 看下这个视频讲了啥'), true)
+assert.equal(/(?:本机|本地).{0,20}(?:图片|文件|照片|截图)/u.test(__wechatyVideoTestInternals.videoAnalysisPendingReplyText), false)
 
 const beforeCount = getDB().prepare('SELECT COUNT(*) AS n FROM wechat_group_media_items').get().n
 const result = await analyzeWechatVideoMessage({

@@ -17,7 +17,7 @@ import { extractPublicImageUrlsFromText, isLikelyPublicImageUrl, normalizePublic
 import { extractWeChatQuoteContext } from './wechat-quote-context.js'
 import { buildWechatExplicitMentionDecision, evaluateWechatAmbientReply, getWeChatAmbientReplyRules } from './wechat-ambient-reply.js'
 import { getClawbotStatus, sendClawbotSelfNotification } from './wechat-clawbot.js'
-import { analyzeWechatVideoMessage, isWechatVideoAnalysisIntent, isWechatVideoMessageType } from './wechat-video-analysis-skill.js'
+import { WECHAT_VIDEO_ANALYSIS_PENDING_REPLY, analyzeWechatVideoMessage, isWechatVideoAnalysisIntent, isWechatVideoMessageType } from './wechat-video-analysis-skill.js'
 import { paths } from '../paths.js'
 import { getDB } from '../db.js'
 import path from 'path'
@@ -2781,7 +2781,7 @@ async function tryDirectVideoAnalysisReply(room, message, text = '', { senderId 
     return true
   }
   console.log(`[WechatVideoSkill] 命中微信群视频解析 topic="${groupName}" sender="${senderName}" source="${candidate.source || 'recent'}" video_sender="${candidate.senderName || senderName}" text="${String(text || '').slice(0, 120)}"`)
-  await sendWechatyDutyGroupMessage(room.id, '收到，正在临时读取这个视频，解析完会删除本地临时文件。', { mentionId: senderId, mentionName: senderName, timeoutMs: 8000 })
+  await sendWechatyDutyGroupMessage(room.id, WECHAT_VIDEO_ANALYSIS_PENDING_REPLY, { mentionId: senderId, mentionName: senderName, timeoutMs: 8000 })
   try {
     const result = await analyzeWechatVideoMessage({ message: candidate.message, text, messageType: candidate.messageType || messageType || 'video', messageId: candidate.messageId || message?.id || '' })
     if (!result.ok) {
@@ -2813,6 +2813,7 @@ export const __wechatyVideoTestInternals = {
   getWechatImageUnderstandingGate,
   buildWechatImageEnhancedText,
   buildWechatImageReplyContext,
+  videoAnalysisPendingReplyText: WECHAT_VIDEO_ANALYSIS_PENDING_REPLY,
   videoReferenceWindowMs: WECHAT_VIDEO_REFERENCE_WINDOW_MS,
   ageRecentWechatVideosForTest(ms = 0) {
     const delta = Number(ms || 0)
