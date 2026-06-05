@@ -32,6 +32,7 @@
 - Brain UI 微信群助手设置页新增独立“舆情推送”配置卡片，可选择接收群、监测平台、关键词、检测间隔和触发规则，并支持手动检查或立即推送。
 - 舆情推送改为优先发送 2x PNG 图片海报，展示事件数、规则、平台分布、关键词、排名变化和重点事件；图片渲染或发送失败时再回退文字。
 - 修复群聊总结期望发图片但实际回退成文字的问题：海报渲染器现在会校验 Playwright 默认 Chromium 路径是否真实存在，并在 Windows/macOS/Linux 下扫描系统 Chrome/Edge 与 Playwright 缓存路径，避免 Windows 上默认浏览器路径失效导致 PNG 生成失败。
+- 修复 `npm run smoke:brain-ui` 在本机缺少当前 Playwright Chromium 可执行文件时无法启动的问题：烟测脚本现在会扫描系统 Chrome/Edge 与已有 Playwright 缓存中的 Chromium/Headless Shell 作为兜底。
 - 修复微信群内回复 @ 人偶发不准确的问题：@ 显示名选择改为优先使用当前群昵称、实时解析到的 `roomAlias` 和成员表 `room_alias`，再退到传入昵称、联系人备注或联系人名，避免旧昵称/备注抢占当前群昵称。
 
 ### 验证
@@ -44,7 +45,7 @@
 - 通过 `node scripts/test-social-targets.mjs`。
 - 通过 `node scripts/run-electron-node.mjs scripts/test-wechat-video-analysis.mjs`。
 - 分别通过 `node --check src/config.js`、`node --check src/hotspot-alert-monitor.js`、`node --check src/social/index.js`、`node --check src/api.js`，并通过舆情监测器 ES 模块导入验证。
-- 通过 `node --check src/ui/brain-ui/app.js`、`node --check src/ui/brain-ui/app-shell.js` 和 `git diff --check`；`npm run smoke:brain-ui` 因本机 Playwright Chromium 缓存缺失未能启动浏览器。
+- 通过 `node --check scripts/smoke-brain-ui.mjs`、`npm run smoke:brain-ui` 和 `git diff --check`，确认 Brain UI 烟测可在当前 Playwright Chromium 缓存缺失时使用本机已有 Chromium 缓存启动。
 - 通过 `node --check src/hotspot-alert-renderer.js`、`node --check src/hotspot-alert-monitor.js`，并用样例舆情事件成功生成 PNG 海报。
 
 ## v0.4.92 - 2026-06-03

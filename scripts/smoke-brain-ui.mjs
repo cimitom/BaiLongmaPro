@@ -314,10 +314,59 @@ function listen(server) {
   })
 }
 
+function resolveChromiumExecutable() {
+  const candidates = []
+  const add = file => {
+    const value = String(file || '').trim()
+    if (value) candidates.push(value)
+  }
+  try { add(chromium.executablePath()) } catch {}
+  add(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH)
+  add(process.env.CHROME_PATH)
+  add(process.env.EDGE_PATH)
+  candidates.push(
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+    '/usr/bin/google-chrome',
+    '/usr/bin/google-chrome-stable',
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+    path.join(process.env.LOCALAPPDATA || '', 'Google/Chrome/Application/chrome.exe'),
+    path.join(process.env.PROGRAMFILES || '', 'Google/Chrome/Application/chrome.exe'),
+    path.join(process.env['PROGRAMFILES(X86)'] || '', 'Google/Chrome/Application/chrome.exe'),
+    path.join(process.env.LOCALAPPDATA || '', 'Microsoft/Edge/Application/msedge.exe'),
+    path.join(process.env.PROGRAMFILES || '', 'Microsoft/Edge/Application/msedge.exe'),
+    path.join(process.env['PROGRAMFILES(X86)'] || '', 'Microsoft/Edge/Application/msedge.exe'),
+  )
+  const cacheDirs = [
+    path.join(process.env.LOCALAPPDATA || '', 'ms-playwright'),
+    path.join(process.env.HOME || '', 'Library/Caches/ms-playwright'),
+    path.join(process.env.HOME || '', '.cache/ms-playwright'),
+  ]
+  try {
+    for (const cacheDir of cacheDirs) {
+      if (!cacheDir || !fs.existsSync(cacheDir)) continue
+      for (const name of fs.readdirSync(cacheDir)) {
+        const base = path.join(cacheDir, name)
+        candidates.push(
+          path.join(base, 'chrome-win64/chrome.exe'),
+          path.join(base, 'chrome-headless-shell-win64/chrome-headless-shell.exe'),
+          path.join(base, 'chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing'),
+          path.join(base, 'chrome-headless-shell-mac-arm64/chrome-headless-shell'),
+          path.join(base, 'chrome-linux/chrome'),
+          path.join(base, 'chrome-headless-shell-linux64/chrome-headless-shell'),
+        )
+      }
+    }
+  } catch {}
+  return candidates.find(file => file && fs.existsSync(file)) || ''
+}
+
 const server = createServer()
 const port = await listen(server)
 const baseUrl = `http://127.0.0.1:${port}`
-const browser = await chromium.launch()
+const executablePath = resolveChromiumExecutable()
+const browser = await chromium.launch({ ...(executablePath ? { executablePath } : {}) })
 const page = await browser.newPage({ viewport: { width: 1280, height: 840 } })
 await page.addInitScript(() => {
   localStorage.setItem('bailongma-memory-graph-enabled', 'true')
