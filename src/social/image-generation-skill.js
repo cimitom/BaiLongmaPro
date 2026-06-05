@@ -11,6 +11,18 @@ const IMAGE_UNDERSTANDING_RE = /(?:看|看看|识别|识图|读|读取|分析|�
 const EXISTING_IMAGE_SEND_RE = /(?:发|发送|转发|传|给我|发我|拿给我).{0,24}(?:那张|这张|刚才|刚刚|上面|前面|原图|已发|图片|图)|(?:那张|这张|刚才|刚刚|上面|前面).{0,24}(?:发|发送|转发|传|给我|发我|拿给我)/u
 const HIGH_QUALITY_RE = /(?:高清|高质量|精细|2k|4k|8k|超清|大图|高分辨率|高分辨)/iu
 
+function normalizeImageRequestParams(value = {}) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+  const blocked = new Set(['model', 'prompt', 'n', 'size', 'quality', 'image_url', 'input'])
+  const out = {}
+  for (const [key, val] of Object.entries(value)) {
+    if (!key || blocked.has(key)) continue
+    if (val === undefined || typeof val === 'function') continue
+    out[key] = val
+  }
+  return out
+}
+
 function readLimits() {
   try { return JSON.parse(fs.readFileSync(LIMIT_FILE, 'utf-8')) || {} } catch { return {} }
 }
@@ -61,6 +73,7 @@ function checkRateLimit({ groupId = '', senderId = '', max = 10 } = {}) {
 async function callImageApi({ prompt, quality, size, config }) {
   const url = `${config.baseUrl.replace(/\/$/, '')}/images/generations`
   const body = {
+    ...normalizeImageRequestParams(config.requestParams),
     model: config.model,
     prompt,
     n: 1,
@@ -97,6 +110,30 @@ async function callImageApi({ prompt, quality, size, config }) {
     return { ok: false, error: err?.name === 'AbortError' ? `图片生成请求超时（${Math.round(timeoutMs / 1000)} 秒）` : (err?.message || String(err)), request: { size, quality } }
   } finally {
     clearTimeout(timer)
+  }
+}
+
+export async function testWechatImageGenerationRuntime(channel = {}, { timeoutSeconds = 180, quality = 'low', size = '1024x1024' } = {}) {
+  const runtime = {
+    provider: channel.provider || 'image',
+    baseUrl: String(channel.baseUrl || channel.baseURL || '').replace(/\/+$/, ''),
+    model: String(channel.model || '').trim(),
+    apiKey: String(channel.apiKey || '').trim(),
+    name: String(channel.name || channel.model || '生图渠道').trim(),
+    requestParams: channel.requestParams || {},
+    apiTimeoutSeconds: Math.min(Math.max(Number(timeoutSeconds || 180), 60), 600),
+  }
+  if (!runtime.baseUrl || !runtime.model || !runtime.apiKey) return { ok: false, error: 'Base URL、模型和 API Key 不能为空' }
+  const result = await callImageApi({
+    prompt: 'Bailongma image generation connectivity test, simple blue circle icon',
+    quality,
+    size,
+    config: runtime,
+  })
+  return {
+    ...result,
+    mode: 'image_generations',
+    channel: { ...channel, apiKey: undefined, configured: true },
   }
 }
 

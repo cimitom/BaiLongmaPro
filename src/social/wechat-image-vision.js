@@ -9,6 +9,11 @@ import { config, getSkillImageVisionCredentials, getSkillImageVisionRuntimeCandi
 let schemaReady = false
 let pendingDescribeJob = null
 const mediaDescribeJobs = new Map()
+const TINY_PNG_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+
+export function ensureWeChatImageVisionSchemaForBackup() {
+  ensureSchema()
+}
 
 function ensureSchema() {
   if (schemaReady) return
@@ -554,6 +559,46 @@ async function callVisionModel(row, runtime, cfg) {
     throw err
   } finally {
     clearTimeout(timer)
+  }
+}
+
+export async function testWeChatImageVisionRuntime(channel = {}, { timeoutSeconds = 45 } = {}) {
+  const runtime = {
+    provider: channel.provider || 'vision',
+    baseURL: normalizeRuntimeBaseURL(channel.baseUrl || channel.baseURL || ''),
+    model: String(channel.model || '').trim(),
+    apiKey: String(channel.apiKey || '').trim(),
+    requestParams: channel.requestParams || {},
+    source: channel.name || channel.id || channel.model || 'vision-test',
+  }
+  if (!runtime.baseURL || !runtime.model || !runtime.apiKey) return { ok: false, error: 'Base URL、模型和 API Key 不能为空' }
+  const started = Date.now()
+  try {
+    const content = await callVisionModel({
+      base64: TINY_PNG_BASE64,
+      mime_type: 'image/png',
+      relative_path: '',
+    }, runtime, {
+      ...getSkillImageVisionCredentials(),
+      apiTimeoutSeconds: Math.min(Math.max(Number(timeoutSeconds || 45), 15), 180),
+    })
+    if (!content) return { ok: false, latencyMs: Date.now() - started, error: '识图接口连通但返回空内容' }
+    return {
+      ok: true,
+      status: 200,
+      latencyMs: Date.now() - started,
+      message: content.slice(0, 120),
+      mode: 'vision_chat_completions',
+      channel: { ...channel, apiKey: undefined, configured: true },
+    }
+  } catch (err) {
+    return {
+      ok: false,
+      latencyMs: Date.now() - started,
+      error: err?.message || String(err),
+      mode: 'vision_chat_completions',
+      channel: { ...channel, apiKey: undefined, configured: true },
+    }
   }
 }
 

@@ -20,6 +20,18 @@ const TINY_MP4_BASE64 = 'AAAAIGZ0eXBpc29tAAACAGlzb21pc28ybXA0MQAAAAhmcmVl'
 
 let lastRun = null
 
+function normalizeVideoRequestParams(value = {}) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+  const blocked = new Set(['messages', 'input', 'video_url'])
+  const out = {}
+  for (const [key, val] of Object.entries(value)) {
+    if (!key || blocked.has(key)) continue
+    if (val === undefined || typeof val === 'function') continue
+    out[key] = val
+  }
+  return out
+}
+
 export function isWechatVideoAnalysisIntent(text = '') {
   return VIDEO_ANALYSIS_REQUEST_RE.test(String(text || ''))
 }
@@ -78,6 +90,7 @@ function normalizeRuntime(channel = {}) {
     model: String(channel.model || '').trim(),
     apiKey: String(channel.apiKey || '').trim(),
     name: String(channel.name || channel.model || '视频解析渠道').trim(),
+    requestParams: channel.requestParams || {},
   }
 }
 
@@ -99,6 +112,7 @@ async function callVideoRuntimeWithBase64(runtime, { base64 = '', mimeType = 'vi
         Accept: 'application/json',
       },
       body: JSON.stringify({
+        ...normalizeVideoRequestParams(runtime.requestParams),
         model: runtime.model,
         temperature: 0.2,
         max_tokens: maxTokens,

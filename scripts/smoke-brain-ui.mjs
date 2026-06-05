@@ -94,6 +94,226 @@ const smokeRooms = [
   { id: 'room_beta_with_a_very_long_identifier_for_layout', topic: '特别长名字的客户支持群用于布局验证', selected: true },
 ]
 
+const smokeBackupGroups = [
+  {
+    backup_group_key: 'group_alpha_backup_key',
+    group_id: 'wechaty:room_alpha',
+    group_name: '白龙马研发群',
+    counts: { activity: 24, messages: 18, memory_items: 5, member_names: 7, member_identities: 3, member_identity_aliases: 4, media_items: 2 },
+    total_rows: 63,
+    latest_message_at: new Date().toISOString(),
+    media_bytes_estimate: 512 * 1024,
+  },
+  {
+    backup_group_key: 'group_beta_backup_key_with_long_text',
+    group_id: 'wechaty:room_beta_with_a_very_long_identifier_for_layout',
+    group_name: '特别长名字的客户支持群用于布局验证和窄屏换行检查',
+    counts: { activity: 128, messages: 96, memory_items: 21, member_names: 44, member_identities: 18, member_identity_aliases: 37, media_items: 11 },
+    total_rows: 355,
+    latest_message_at: new Date().toISOString(),
+    media_bytes_estimate: 7 * 1024 * 1024,
+  },
+]
+
+const smokeSkills = {
+  imageGeneration: {
+    enabled: true,
+    failoverEnabled: true,
+    activeChannelId: 'image_smoke',
+    baseUrl: 'https://image.example.test/v1',
+    model: 'gpt-image-2',
+    configured: true,
+    maxPerUserPerHour: 10,
+    defaultQuality: 'low',
+    defaultSize: '1024x1024',
+    highQuality: 'high',
+    highSize: '1024x1024',
+    apiTimeoutSeconds: 180,
+    channels: [{ id: 'image_smoke', name: 'Smoke 生图渠道', enabled: true, configured: true, apiKeyHint: 'sk-***img', baseUrl: 'https://image.example.test/v1', model: 'gpt-image-2', requestParams: { user: 'smoke' } }],
+  },
+  imageVision: {
+    enabled: true,
+    autoDescribe: true,
+    preferCurrentMultimodal: true,
+    failoverEnabled: true,
+    activeChannelId: 'vision_smoke',
+    baseUrl: 'https://vision.example.test/v1',
+    model: 'gpt-4o-mini',
+    configured: true,
+    apiTimeoutSeconds: 45,
+    maxImageBytesMB: 8,
+    channels: [{ id: 'vision_smoke', name: 'Smoke 识图渠道', enabled: true, configured: true, apiKeyHint: 'sk-***vis', baseUrl: 'https://vision.example.test/v1', model: 'gpt-4o-mini' }],
+  },
+  videoAnalysis: {
+    enabled: true,
+    failoverEnabled: true,
+    activeChannelId: 'video_smoke',
+    baseUrl: 'https://video.example.test/v1',
+    model: 'gpt-4o-mini',
+    configured: true,
+    apiTimeoutSeconds: 90,
+    maxVideoBytesMB: 25,
+    channels: [{ id: 'video_smoke', name: 'Smoke 视频渠道', enabled: true, configured: true, apiKeyHint: 'sk-***vid', baseUrl: 'https://video.example.test/v1', model: 'gpt-4o-mini' }],
+  },
+}
+
+async function inspectWechatBackupUi(page, viewport) {
+  await page.setViewportSize(viewport)
+  await page.evaluate(() => {
+    document.querySelector('.wechaty-backup-panel')?.scrollIntoView({ block: 'center', inline: 'nearest' })
+  })
+  await page.waitForTimeout(80)
+  return page.evaluate(({ width, height }) => {
+    const panel = document.querySelector('.wechaty-backup-panel')
+    const content = document.querySelector('.settings-content')
+    const modal = document.querySelector('.settings-modal')
+    const failures = []
+    if (!panel) return { viewport: { width, height }, failures: ['backup panel missing'] }
+
+    const panelRect = panel.getBoundingClientRect()
+    const contentRect = content?.getBoundingClientRect() || document.body.getBoundingClientRect()
+    const modalRect = modal?.getBoundingClientRect() || document.body.getBoundingClientRect()
+    const docOverflow = Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - window.innerWidth
+    if (docOverflow > 2) failures.push(`document horizontal overflow ${docOverflow}`)
+    if (content && content.scrollWidth - content.clientWidth > 2) failures.push(`settings content overflow ${content.scrollWidth - content.clientWidth}`)
+    if (panel.scrollWidth - panel.clientWidth > 2) failures.push(`backup panel overflow ${panel.scrollWidth - panel.clientWidth}`)
+
+    const containedSelectors = [
+      '.wechaty-backup-toolbar',
+      '.wechaty-backup-import-head',
+      '.wechaty-backup-summary',
+      '.wechaty-backup-group',
+      '.wechaty-backup-preview',
+      '.wechaty-backup-result',
+      '.wechaty-backup-column',
+      '.settings-save-btn',
+    ]
+    const containedIssues = [...panel.querySelectorAll(containedSelectors.join(','))]
+      .map(el => {
+        const rect = el.getBoundingClientRect()
+        const text = (el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 40)
+        const overflow = el.scrollWidth - el.clientWidth
+        const outside = rect.width > 0 && (rect.left < contentRect.left - 2 || rect.right > contentRect.right + 2)
+        return outside || overflow > 2 ? { text, className: String(el.className || el.tagName), width: rect.width, overflow, outside } : null
+      })
+      .filter(Boolean)
+    if (containedIssues.length) failures.push(`contained overflow ${JSON.stringify(containedIssues.slice(0, 5))}`)
+
+    const cardIssues = [...panel.querySelectorAll('.wechaty-backup-group, .wechaty-backup-preview-row')]
+      .map(card => {
+        const rect = card.getBoundingClientRect()
+        const badChildren = [...card.children].filter(child => {
+          const r = child.getBoundingClientRect()
+          return r.width > 0 && (r.left < rect.left - 2 || r.right > rect.right + 2 || child.scrollWidth - child.clientWidth > 2)
+        }).map(child => (child.textContent || child.tagName || '').trim().replace(/\s+/g, ' ').slice(0, 40))
+        return badChildren.length ? { text: (card.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 60), badChildren } : null
+      })
+      .filter(Boolean)
+    if (cardIssues.length) failures.push(`card child overflow ${JSON.stringify(cardIssues.slice(0, 5))}`)
+
+    const buttonIssues = [...panel.querySelectorAll('.settings-save-btn')]
+      .map(btn => {
+        const rect = btn.getBoundingClientRect()
+        const text = (btn.textContent || '').trim()
+        const charCount = Array.from(text).length
+        const tooNarrow = charCount >= 4 && rect.width < 64
+        const clipped = btn.scrollWidth - btn.clientWidth > 2 || btn.scrollHeight - btn.clientHeight > 2
+        return tooNarrow || clipped ? { text, width: rect.width, height: rect.height, clipped, tooNarrow } : null
+      })
+      .filter(Boolean)
+    if (buttonIssues.length) failures.push(`button readability ${JSON.stringify(buttonIssues)}`)
+
+    const resultStyle = getComputedStyle(document.querySelector('.wechaty-backup-result'))
+    if (['fixed', 'absolute'].includes(resultStyle.position)) failures.push(`result area uses ${resultStyle.position}`)
+    const toolbarHeight = document.querySelector('.wechaty-backup-toolbar')?.getBoundingClientRect().height || 0
+    if (toolbarHeight > 150) failures.push(`toolbar too tall ${toolbarHeight}`)
+
+    return {
+      viewport: { width, height },
+      modal: { width: modalRect.width, left: modalRect.left, right: modalRect.right },
+      panel: { width: panelRect.width, height: panelRect.height },
+      toolbarHeight,
+      groupCards: panel.querySelectorAll('.wechaty-backup-group').length,
+      failures,
+    }
+  }, viewport)
+}
+
+async function inspectSkillFeedbackUi(page, viewport) {
+  await page.setViewportSize(viewport)
+  await page.click('.settings-nav-item[data-tab="skills"]')
+  await page.waitForFunction(() => document.querySelector('.settings-tab[data-tab="skills"]')?.classList.contains('active'), null, { timeout: 3000 })
+  await page.evaluate(() => {
+    const longError = 'HTTP 503，Service temporarily unavailable；上游服务临时不可用，不代表本地保存失败；可稍后重试或切换备用渠道。'.repeat(8)
+    for (const id of ['skill-image-feedback', 'skill-vision-feedback', 'skill-video-feedback']) {
+      const el = document.getElementById(id)
+      if (!el) continue
+      el.textContent = longError
+      el.className = 'settings-feedback skill-test-feedback error'
+      el.dataset.feedbackClass = 'skill-test-feedback'
+    }
+    document.getElementById('skill-image-feedback')?.scrollIntoView({ block: 'center', inline: 'nearest' })
+  })
+  await page.waitForTimeout(80)
+  return page.evaluate(({ width, height }) => {
+    const content = document.querySelector('.settings-content')
+    const modal = document.querySelector('.settings-modal')
+    const tab = document.querySelector('.settings-tab[data-tab="skills"]')
+    const failures = []
+    if (!tab) return { viewport: { width, height }, failures: ['skills tab missing'] }
+    const contentRect = content?.getBoundingClientRect() || document.body.getBoundingClientRect()
+    const modalRect = modal?.getBoundingClientRect() || document.body.getBoundingClientRect()
+    const docOverflow = Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - window.innerWidth
+    if (docOverflow > 2) failures.push(`document horizontal overflow ${docOverflow}`)
+    if (content && content.scrollWidth - content.clientWidth > 2) failures.push(`settings content overflow ${content.scrollWidth - content.clientWidth}`)
+
+    const feedbacks = [...tab.querySelectorAll('.skill-test-feedback')].map(el => {
+      const rect = el.getBoundingClientRect()
+      const style = getComputedStyle(el)
+      const row = el.closest('.settings-row-action')
+      const buttons = [...(row?.querySelectorAll('.settings-save-btn') || [])]
+      const overlaps = buttons
+        .filter(btn => {
+          const b = btn.getBoundingClientRect()
+          return rect.width > 0 && b.width > 0 && rect.left < b.right - 1 && rect.right > b.left + 1 && rect.top < b.bottom - 1 && rect.bottom > b.top + 1
+        })
+        .map(btn => (btn.textContent || '').trim())
+      const horizontalOverflow = el.scrollWidth - el.clientWidth
+      const outside = rect.width > 0 && (rect.left < contentRect.left - 2 || rect.right > contentRect.right + 2)
+      if (horizontalOverflow > 2) failures.push(`${el.id} horizontal overflow ${horizontalOverflow}`)
+      if (outside) failures.push(`${el.id} outside content`)
+      if (rect.height > 122) failures.push(`${el.id} too tall ${rect.height}`)
+      if (overlaps.length) failures.push(`${el.id} overlaps buttons ${overlaps.join(',')}`)
+      if (['fixed', 'absolute'].includes(style.position)) failures.push(`${el.id} uses ${style.position}`)
+      return {
+        id: el.id,
+        width: rect.width,
+        height: rect.height,
+        scrollHeight: el.scrollHeight,
+        position: style.position,
+      }
+    })
+
+    const buttonIssues = [...tab.querySelectorAll('.settings-row-action .settings-save-btn')]
+      .map(btn => {
+        const rect = btn.getBoundingClientRect()
+        const text = (btn.textContent || '').trim()
+        const clipped = btn.scrollWidth - btn.clientWidth > 2 || btn.scrollHeight - btn.clientHeight > 2
+        const tooNarrow = Array.from(text).length >= 4 && rect.width < 64
+        return clipped || tooNarrow ? { text, width: rect.width, height: rect.height, clipped, tooNarrow } : null
+      })
+      .filter(Boolean)
+    if (buttonIssues.length) failures.push(`skill button readability ${JSON.stringify(buttonIssues.slice(0, 6))}`)
+
+    return {
+      viewport: { width, height },
+      modal: { width: modalRect.width, left: modalRect.left, right: modalRect.right },
+      feedbacks,
+      failures,
+    }
+  }, viewport)
+}
+
 function createServer() {
   const sseClients = new Set()
   const server = http.createServer((req, res) => {
@@ -166,7 +386,23 @@ function createServer() {
           openai: { models: [{ id: 'gpt-4.1-mini', label: 'GPT 4.1 mini' }] },
         },
         minimax: { configured: false },
+        skills: smokeSkills,
       })
+      return
+    }
+
+    if (url.pathname === '/settings/skills') {
+      sendJson(res, { ok: true, skills: smokeSkills })
+      return
+    }
+
+    if (url.pathname === '/settings/skills/image-vision/status') {
+      sendJson(res, { ok: true, status: { configured: true, runtime: { provider: 'vision', model: 'gpt-4o-mini', baseURL: 'https://vision.example.test/v1', source: 'skill' }, counts: { total: 2, pending: 0, failed: 0 } } })
+      return
+    }
+
+    if (url.pathname === '/settings/skills/video-analysis/status') {
+      sendJson(res, { ok: true, status: { enabled: true, configured: true, runtime: { provider: 'video', model: 'gpt-4o-mini', baseURL: 'https://video.example.test/v1', source: 'skill' }, tempDir: '/tmp/bailongma-smoke-video', lastRun: null } })
       return
     }
 
@@ -269,6 +505,76 @@ function createServer() {
 
     if (url.pathname === '/social/wechat-clawbot/qr') {
       sendJson(res, { ok: true, qr: null, status: 'unavailable' })
+      return
+    }
+
+    if (url.pathname === '/social/wechat-groups/known') {
+      sendJson(res, { ok: true, groups: smokeRooms.map(room => ({ id: room.id, topic: room.topic, selected: room.selected })) })
+      return
+    }
+
+    if (url.pathname === '/settings/social/wechat-group-archive') {
+      sendJson(res, {
+        ok: true,
+        wechatGroupArchive: { enabled: true, selectedGroups: ['room_alpha'], recordMediaFiles: true },
+        wechatyDutyGroup: { enabled: true, rooms: smokeRooms, groupNames: smokeRooms.map(room => room.topic) },
+      })
+      return
+    }
+
+    if (url.pathname === '/settings/database') {
+      sendJson(res, {
+        ok: true,
+        db_path: '/tmp/bailongma-smoke.db',
+        tables: [
+          { name: 'wechat_group_activity', count: 152, bytes: 120000 },
+          { name: 'wechat_group_messages', count: 114, bytes: 90000 },
+          { name: 'wechat_group_memory_items', count: 26, bytes: 26000 },
+          { name: 'wechat_group_media_items', count: 13, bytes: 240000 },
+        ],
+        totals: { tables: 4, rows: 305, bytes: 476000 },
+      })
+      return
+    }
+
+    if (url.pathname === '/social/wechat-groups/memory-index/status') {
+      sendJson(res, {
+        ok: true,
+        activity_fts: 152,
+        chunks: 36,
+        messages: 114,
+        memories: 26,
+        errors: [],
+      })
+      return
+    }
+
+    if (url.pathname === '/social/wechat-groups/images') {
+      sendJson(res, {
+        ok: true,
+        rows: [],
+        total: 0,
+        offset: Number(url.searchParams.get('offset') || 0),
+        limit: Number(url.searchParams.get('limit') || 24),
+        has_more: false,
+        counts: { total: 0, pending: 0, done: 0, error: 0 },
+      })
+      return
+    }
+
+    if (url.pathname === '/social/wechat-groups/backup/groups') {
+      sendJson(res, {
+        ok: true,
+        generated_at: new Date().toISOString(),
+        groups: smokeBackupGroups,
+        totals: smokeBackupGroups.reduce((acc, group) => {
+          acc.groups += 1
+          acc.rows += group.total_rows
+          acc.media_bytes_estimate += group.media_bytes_estimate
+          for (const [key, value] of Object.entries(group.counts)) acc[key] = (acc[key] || 0) + value
+          return acc
+        }, { groups: 0, rows: 0, media_bytes_estimate: 0 }),
+      })
       return
     }
 
@@ -469,10 +775,50 @@ try {
   if (llmUi.summaryCards < 5) throw new Error('LLM summary cards missing')
   const overflowingCards = llmUi.cards.filter(card => card.overflowingChildren.length)
   if (overflowingCards.length) throw new Error(`LLM profile card overflow: ${JSON.stringify(overflowingCards)}`)
+
+  const skillFeedbackUi = []
+  for (const viewport of [
+    { width: 1280, height: 840 },
+    { width: 390, height: 844 },
+    { width: 320, height: 720 },
+  ]) {
+    const report = await inspectSkillFeedbackUi(page, viewport)
+    skillFeedbackUi.push(report)
+    if (report.failures.length) throw new Error(`Skill feedback UI overflow at ${viewport.width}x${viewport.height}: ${report.failures.join('; ')}`)
+  }
+
+  await page.click('.settings-nav-item[data-tab="database"]')
+  await page.waitForFunction(() => document.querySelector('.settings-tab[data-tab="database"]')?.classList.contains('active'), null, { timeout: 3000 })
+  await page.waitForFunction(() => document.querySelector('#wechaty-backup-group-list')?.textContent.includes('白龙马研发群'), null, { timeout: 3000 })
+  const databaseVisibility = await page.evaluate(() => {
+    const overlay = document.querySelector('.settings-overlay')
+    const panel = document.querySelector('.wechaty-backup-panel')
+    const tab = document.querySelector('.settings-tab[data-tab="database"]')
+    const activeTabs = [...document.querySelectorAll('.settings-tab.active')].map(el => el.dataset.tab || '')
+    return {
+      overlayHidden: overlay?.hasAttribute('hidden') || getComputedStyle(overlay).display === 'none',
+      tabActive: tab?.classList.contains('active') || false,
+      tabDisplay: tab ? getComputedStyle(tab).display : '',
+      panelWidth: panel?.getBoundingClientRect().width || 0,
+      panelDisplay: panel ? getComputedStyle(panel).display : '',
+      activeTabs,
+    }
+  })
+  if (databaseVisibility.panelWidth <= 100) throw new Error(`database backup panel not visible: ${JSON.stringify(databaseVisibility)}`)
+  const backupUi = []
+  for (const viewport of [
+    { width: 1280, height: 840 },
+    { width: 390, height: 844 },
+    { width: 320, height: 720 },
+  ]) {
+    const report = await inspectWechatBackupUi(page, viewport)
+    backupUi.push(report)
+    if (report.failures.length) throw new Error(`WeChat backup UI overflow at ${viewport.width}x${viewport.height}: ${report.failures.join('; ')}`)
+  }
   if (errors.length) throw new Error(`browser errors:\n${errors.join('\n')}`)
 
   console.log('[PASS] brain-ui smoke')
-  console.log(JSON.stringify({ ...snapshot, llmUi }, null, 2))
+  console.log(JSON.stringify({ ...snapshot, llmUi, skillFeedbackUi, backupUi }, null, 2))
 } finally {
   await browser.close()
   server.closeAllSse()
