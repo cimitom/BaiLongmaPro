@@ -6,9 +6,11 @@ import { paths } from '../paths.js'
 
 const LIMIT_FILE = path.join(paths.dataDir, 'skill-image-generation-limits.json')
 const OUTPUT_DIR = path.join(paths.dataDir, 'generated-images')
-const IMAGE_REQUEST_RE = /(?:生成|绘制|做|制作|设计|创作).{0,40}(?:图片|图像|插画|海报|头像|壁纸|封面|logo|图标|照片|图)|(?:画|画个|画一个|画一张|给我画|帮我画|请画).{0,30}(?:图片|图像|插画|海报|头像|壁纸|封面|logo|图标|照片|图)|(?:生图|画图|生成图|生成图片|AI图|ai图|出图)/iu
+const IMAGE_NOUN_RE = /(?:图片|图像|插画|海报|头像|壁纸|封面|logo|图标|照片|图)/iu
+const IMAGE_REQUEST_RE = /(?:给我|帮我|请|麻烦)?画(?:一下|一个|个|一张|一幅|张|幅|点|些)?[\s\S]{1,40}|(?:生成|绘制)(?:一下)?(?:一张|一幅|张|幅|张图|图片|图像|插画|海报|头像|壁纸|封面|logo|图标|照片|图)[\s\S]{1,40}|(?:做|制作|设计|创作)(?:一下|一个|个|一张|一幅|张|幅|点|些)?[\s\S]{0,30}(?:图片|图像|插画|海报|头像|壁纸|封面|logo|图标|照片|图)|(?:生图|画图|生成图|生成图片|AI图|ai图|出图)/iu
 const IMAGE_UNDERSTANDING_RE = /(?:看|看看|识别|识图|读|读取|分析|判断|解释|理解|ocr|OCR|报错|错误|内容|里面|里边|图里|图片里|图中|引用|这张图|这图|截图里|照片里|看图|读图)/u
 const EXISTING_IMAGE_SEND_RE = /(?:发|发送|转发|传|给我|发我|拿给我).{0,24}(?:那张|这张|刚才|刚刚|上面|前面|原图|已发|图片|图)|(?:那张|这张|刚才|刚刚|上面|前面).{0,24}(?:发|发送|转发|传|给我|发我|拿给我)/u
+const IMAGE_SEARCH_RE = /(?:搜|搜索|找|找张|找个|查|查找|网上|网络|百度|图库).{0,24}(?:图片|图像|照片|图|壁纸|头像|表情包)?|(?:来张|来个|发个|发张|发一张|给我发|发我).{0,24}(?:图片|图像|照片|图|壁纸|头像|表情包)/u
 const HIGH_QUALITY_RE = /(?:高清|高质量|精细|2k|4k|8k|超清|大图|高分辨率|高分辨)/iu
 
 function normalizeImageRequestParams(value = {}) {
@@ -40,14 +42,18 @@ export function isWechatImageGenerationRequest(text = '') {
   const value = String(text || '')
   if (IMAGE_UNDERSTANDING_RE.test(value) && /(?:\[图片\]|图片|图|截图|照片|引用)/u.test(value)) return false
   if (EXISTING_IMAGE_SEND_RE.test(value) && /(?:图片|图|照片|山水画|截图)/u.test(value)) return false
-  return IMAGE_REQUEST_RE.test(value)
+  if (IMAGE_SEARCH_RE.test(value) && !/(?:画|绘制|生成|创作|制作|设计|生图|画图|出图)/u.test(value)) return false
+  if (!IMAGE_REQUEST_RE.test(value)) return false
+  return /(?:画|绘制|生成|生图|画图|出图)/u.test(value) || IMAGE_NOUN_RE.test(value)
 }
 
-function extractPrompt(text = '') {
+export function extractWechatImageGenerationPrompt(text = '') {
   return String(text || '')
     .replace(/^[@＠][^\s\u2005\u2006\u2007\u2008\u2009\u200a，,：:、]{1,40}/u, '')
+    .trimStart()
     .replace(/^(帮我|给我|请|麻烦|小白龙|前夜|贾维斯)/iu, '')
-    .replace(/(?:生成|画|绘制|做|制作|出|来|给我|帮我|请).{0,4}(?:一张|一个|1张)?(?:图片|图像|插画|海报|头像|壁纸|图|照片)/iu, '')
+    .trimStart()
+    .replace(/^(?:帮我|给我|请|麻烦)?(?:生成|画|绘制|做|制作|设计|创作|出)(?:一下|一个|个|一张|一幅|1张|张|幅|点|些)?(?:图片|图像|插画|海报|头像|壁纸|封面|logo|图标|照片|图)?/iu, '')
     .replace(/(?:生图|画图|生成图|生成图片|AI图|ai图|出图)/giu, '')
     .replace(/\s+/g, ' ')
     .trim()
@@ -160,7 +166,7 @@ export async function generateImageForWechat({ text = '', groupId = '', groupNam
   if (config.enabled === false) return { ok: false, skipped: true, error: '生图 Skill 未启用' }
   const channels = getSkillImageRuntimeCandidates()
   if (!channels.length) return { ok: false, error: '生图模型渠道未配置，请到设置 > Skill 技能 > 生图渠道池 中至少启用一个可用渠道。' }
-  const prompt = extractPrompt(text) || String(text || '').replace(/^[@＠][^\s]+/u, '').trim()
+  const prompt = extractWechatImageGenerationPrompt(text) || String(text || '').replace(/^[@＠][^\s]+/u, '').trim()
   if (!prompt) return { ok: false, error: '请告诉我要生成什么图片。' }
   const limit = checkRateLimit({ groupId, senderId, max: config.maxPerUserPerHour })
   if (!limit.allowed) return { ok: false, limited: true, error: `生图次数已达上限：每人每小时最多 ${limit.max} 张，请下个小时再试。` }

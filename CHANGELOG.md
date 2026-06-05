@@ -2,6 +2,21 @@
 
 所有重要版本都需要在这里写清楚：版本号、日期、改动内容、部署/备份注意事项。以后每次升级版本，必须同步更新 `package.json`、`package-lock.json`、`README.md`、`BACKUP-YYYY-MM-DD.md` 和 Brain UI 设置页里的更新说明。
 
+## 未发布 - 2026-06-06
+
+### 修复
+- 放宽微信群生图触发词：参考 `wechatbot` 的绘图工具意图处理方式，支持“画一个欧美猫娘”“给我画一个欧美猫娘”“生成一张欧美猫娘”等自然表达直接进入生图 Skill；同时保留搜图、发旧图、识图和普通“生成总结/报告”等请求的排除，避免误走生图。
+- 生图提示词清洗改为导出可测试函数，去掉 @ 助手名和“画一个/生成一张”等指令壳，保留用户原始绘图对象，不做转译、改写或总结。
+
+### 验证
+- 通过 `node scripts/test-wechat-image-generation-intent.mjs`。
+- 通过 `node --check src/social/image-generation-skill.js`。
+- 通过 `node --check scripts/test-wechat-image-generation-intent.mjs`。
+- 通过 `node scripts/run-electron-node.mjs scripts/test-wechat-multi-mention-quote-image.mjs`。
+
+### 部署/备份注意事项
+- 未改动生图渠道配置、API Key、模型参数和速率限制；已配置的本地运行态生图渠道无需重新配置。
+
 ## v0.4.96 - 2026-06-05
 
 ### 新增
