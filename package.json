@@ -145,8 +145,8 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "xiaoguiwucan",
-        "repo": "BaiLongma",
+        "owner": "yideng966",
+        "repo": "BaiLongmaPro",
         "releaseType": "release"
       }
     ]

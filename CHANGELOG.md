@@ -7,6 +7,7 @@
 ### 新增
 - 项目 Agent 规范更新：`AGENTS.md` 不再维护变更历史，所有代码、配置和项目规范变更历史统一写入 `CHANGELOG.md`；同时明确新增功能必须同步更新 `README.md`，Git 提交信息必须使用中文。
 - README 同步补充当前未发布能力、微信群助手最新能力、常用验证命令和开发约定，降低文档与当前代码能力脱节的风险。
+- GitHub Release 发布目标改为 `yideng966/BaiLongmaPro`，并新增 GitHub Actions tag 触发自动构建发布流程：推送 `v*` 标签后在 Windows/macOS runner 上分别执行发布命令并上传 Release 资产。
 - 微信群助手新增“允许非 @ 主动回复”配置，默认关闭；开启后仅对已勾选回复群生效，并通过群级冷却间隔控制频率。@ 当前登录微信号的消息仍然必回且不受冷却限制。
 - 微信群助手新增“屏蔽成员”配置：按 Wechaty sender_id 精确屏蔽指定群成员，被屏蔽成员消息仍入库统计，但无论 @ 助手还是开启非 @ 主动回复都不会进入回复链路。
 - Brain UI 的“微信群助手”设置页新增左侧二级菜单，按连接与回复群、回复能力、记忆战报、舆情推送、知识库连接和安全边界拆分入口，减少长页面滚动查找成本。
@@ -26,6 +27,8 @@
 - 修复微信群内回复 @ 人偶发不准确的问题：@ 显示名选择改为优先使用当前群昵称、实时解析到的 `roomAlias` 和成员表 `room_alias`，再退到传入昵称、联系人备注或联系人名，避免旧昵称/备注抢占当前群昵称。
 
 ### 验证
+- 通过 `node -e "JSON.parse(require('fs').readFileSync('package.json','utf8'))"` 验证 `package.json` JSON 语法。
+- 通过 PowerShell YAML 关键字段检查，确认 `.github/workflows/release.yml` 包含 tag 触发、`contents: write` 权限、Windows/macOS 构建矩阵和 `GH_TOKEN` 发布环境变量。
 - 通过群聊战报渲染复现脚本，确认可输出 PNG 图片。
 - 通过 `node scripts/test-wechat-mention-display-name.mjs`。
 - 通过 `node scripts/run-electron-node.mjs scripts/test-wechat-multi-mention-quote-image.mjs`。

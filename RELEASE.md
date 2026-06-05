@@ -1256,11 +1256,17 @@ Installer output:
 
 1. Commit and push the release commit.
 2. Ensure `package.json` version matches the release version.
-3. Create a GitHub personal access token with `repo` permission.
-4. Set the token in the current shell.
+3. Create and push a version tag. GitHub Actions will build Windows and macOS packages and publish them to `yideng966/BaiLongmaPro`.
 
 ```bash
-cd BaiLongma
+git tag v0.4.93
+git push origin v0.4.93
+```
+
+Manual fallback:
+
+```bash
+cd BaiLongmaPro
 export GH_TOKEN="ghp_your_token"
 npm run publish:mac
 ```
