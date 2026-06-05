@@ -2,6 +2,21 @@
 
 所有重要版本都需要在这里写清楚：版本号、日期、改动内容、部署/备份注意事项。以后每次升级版本，必须同步更新 `package.json`、`package-lock.json`、`README.md`、`BACKUP-YYYY-MM-DD.md` 和 Brain UI 设置页里的更新说明。
 
+## v0.4.94 - 2026-06-05
+
+### 修复
+- 解决 GitHub issue #6：默认源码启动改为 LAN 模式，`npm start` 和 `npm run start:backend` 现在与 LAN 别名统一走跨平台启动器，默认设置 `BAILONGMA_HOST=0.0.0.0` 与 `BAILONGMA_ALLOW_LAN=1`。
+- 新增 `scripts/start-lan.mjs`，启动时会枚举本机私有 IPv4 地址并打印 `http://<局域网 IP>:3721/brain-ui`，便于同一局域网设备直接访问。
+
+### 验证
+- 通过 `node --check scripts/start-lan.mjs`。
+- 通过 `node --check src/api.js`。
+- 通过 `node -e "JSON.parse(require('fs').readFileSync('package.json','utf8'))"`。
+- 通过 `git diff --check`。
+
+### 部署/备份注意事项
+- 默认源码启动会暴露给同一局域网私有地址；敏感接口仍沿用本地、LAN 私有地址和 token 访问边界。若无法跨设备访问，请检查系统防火墙的专用网络放行规则。
+
 ## v0.4.93 - 2026-06-05
 
 ### 新增

@@ -1,7 +1,7 @@
 {
   "name": "bailongma",
   "productName": "Bailongma",
-  "version": "0.4.93",
+  "version": "0.4.94",
   "description": "A continuously running digital consciousness framework",
   "type": "module",
   "main": "electron/main.cjs",
@@ -9,10 +9,10 @@
     "name": "xiaoyuanda666-ship-it"
   },
   "scripts": {
-    "start": "electron .",
-    "start:lan": "powershell -ExecutionPolicy Bypass -File scripts/start-lan.ps1 app",
-    "start:backend": "node --env-file=.env src/index.js",
-    "start:backend:lan": "powershell -ExecutionPolicy Bypass -File scripts/start-lan.ps1 backend",
+    "start": "node scripts/start-lan.mjs app",
+    "start:lan": "node scripts/start-lan.mjs app",
+    "start:backend": "node scripts/start-lan.mjs backend",
+    "start:backend:lan": "node scripts/start-lan.mjs backend",
     "dev": "node --env-file=.env --watch src/index.js",
     "build": "powershell -ExecutionPolicy Bypass -File scripts/prebuild-clean.ps1 && electron-rebuild -f -w better-sqlite3 -v 33.4.11 && electron-builder --win",
     "build:mac": "electron-rebuild -f -w better-sqlite3 -v 33.4.11 && electron-builder --mac --arm64",

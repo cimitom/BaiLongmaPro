@@ -1,3 +1,24 @@
+## v0.4.94 - 2026-06-05
+
+### 发布主题
+修复 GitHub issue #6：默认源码启动改为 LAN 模式，方便同一局域网设备直接访问 Brain UI。
+
+### 修复
+- `npm start`、`npm run start:backend`、`npm run start:lan`、`npm run start:backend:lan` 统一走 `scripts/start-lan.mjs`。
+- 启动器默认设置 `BAILONGMA_HOST=0.0.0.0` 与 `BAILONGMA_ALLOW_LAN=1`，并打印当前机器可用的 `http://<局域网 IP>:3721/brain-ui`。
+- 保留旧的 `scripts/start-lan.ps1`，避免依赖该脚本的本地使用方式立即失效。
+
+### 验证
+- 通过 `node --check scripts/start-lan.mjs`。
+- 通过 `node --check src/api.js`。
+- 通过 `node -e "JSON.parse(require('fs').readFileSync('package.json','utf8'))"`。
+- 通过 `git diff --check`。
+
+### 使用说明
+1. 源码运行直接执行 `npm start`。
+2. 终端会打印同网设备可访问的 Brain UI 地址。
+3. 如果同网设备打不开页面，检查系统防火墙是否允许 Node/Electron 访问专用网络。
+
 ## v0.4.93 - 2026-06-05
 
 ### 发布主题
@@ -1274,8 +1295,8 @@ Installer output:
 3. Create and push a version tag. GitHub Actions will build Windows and macOS packages and publish them to `yideng966/BaiLongmaPro`.
 
 ```bash
-git tag v0.4.93
-git push origin v0.4.93
+git tag v0.4.94
+git push origin v0.4.94
 ```
 
 Manual fallback:
