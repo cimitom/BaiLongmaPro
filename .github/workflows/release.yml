@@ -1,6 +1,17 @@
 name: Release
 
 on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Build platform
+        required: true
+        default: macos
+        type: choice
+        options:
+          - all
+          - windows
+          - macos
   push:
     tags:
       - "v*"
@@ -17,28 +28,53 @@ jobs:
       matrix:
         include:
           - name: Windows x64
+            platform: windows
             os: windows-latest
             install: npm ci --no-fund --no-audit
             command: npm run publish
           - name: macOS arm64
+            platform: macos
             os: macos-latest
             install: npm ci --ignore-scripts --no-fund --no-audit
             command: npm run publish:mac
 
     steps:
+      - name: Skip unselected platform
+        if: >-
+          github.event_name == 'workflow_dispatch' &&
+          github.event.inputs.platform != 'all' &&
+          github.event.inputs.platform != matrix.platform
+        run: echo "Skipping ${{ matrix.platform }} build"
+
       - name: Checkout
+        if: >-
+          github.event_name != 'workflow_dispatch' ||
+          github.event.inputs.platform == 'all' ||
+          github.event.inputs.platform == matrix.platform
         uses: actions/checkout@v4
 
       - name: Setup Node.js
+        if: >-
+          github.event_name != 'workflow_dispatch' ||
+          github.event.inputs.platform == 'all' ||
+          github.event.inputs.platform == matrix.platform
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
       - name: Install dependencies
+        if: >-
+          github.event_name != 'workflow_dispatch' ||
+          github.event.inputs.platform == 'all' ||
+          github.event.inputs.platform == matrix.platform
         run: ${{ matrix.install }}
 
       - name: Build and publish
+        if: >-
+          github.event_name != 'workflow_dispatch' ||
+          github.event.inputs.platform == 'all' ||
+          github.event.inputs.platform == matrix.platform
         run: ${{ matrix.command }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
