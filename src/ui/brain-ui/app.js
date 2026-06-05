@@ -2525,13 +2525,14 @@ function initTTSSettings() {
       clearTimeout(el._feedbackTimer);
       el._feedbackTimer = null;
     }
+    const extraClass = String(el.dataset?.feedbackClass || "").trim();
     el.textContent = msg;
-    el.className = "settings-feedback" + (isError ? " error" : "");
+    el.className = `settings-feedback${extraClass ? ` ${extraClass}` : ""}${isError ? " error" : ""}`;
     const timeoutMs = Number(options.timeoutMs ?? 3000);
     if (timeoutMs > 0) {
       el._feedbackTimer = setTimeout(() => {
         el.textContent = "";
-        el.className = "settings-feedback";
+        el.className = `settings-feedback${extraClass ? ` ${extraClass}` : ""}`;
         el._feedbackTimer = null;
       }, timeoutMs);
     }
@@ -6122,10 +6123,10 @@ function initTTSSettings() {
 
   function getSkillChannelState(kind = "image") {
     return kind === "video"
-      ? { channels: skillVideoChannels, activeId: skillVideoActiveChannelId, list: skillVideoChannelList, feedback: skillVideoFeedback, models: BUILTIN_VIDEO_MODELS }
+      ? { channels: skillVideoChannels, activeId: skillVideoActiveChannelId, list: skillVideoChannelList, feedback: skillVideoFeedback, models: BUILTIN_VIDEO_MODELS, failover: skillVideoFailover, testBtn: skillVideoTestBtn }
       : kind === "vision"
-      ? { channels: skillVisionChannels, activeId: skillVisionActiveChannelId, list: skillVisionChannelList, feedback: skillVisionFeedback, models: BUILTIN_VISION_MODELS }
-      : { channels: skillImageChannels, activeId: skillImageActiveChannelId, list: skillImageChannelList, feedback: skillImageFeedback, models: BUILTIN_IMAGE_MODELS };
+      ? { channels: skillVisionChannels, activeId: skillVisionActiveChannelId, list: skillVisionChannelList, feedback: skillVisionFeedback, models: BUILTIN_VISION_MODELS, failover: skillVisionFailover, testBtn: skillVisionTestBtn }
+      : { channels: skillImageChannels, activeId: skillImageActiveChannelId, list: skillImageChannelList, feedback: skillImageFeedback, models: BUILTIN_IMAGE_MODELS, failover: skillImageFailover, testBtn: skillImageTestBtn };
   }
 
   function setSkillChannelState(kind = "image", channels = [], activeId = "") {
@@ -6237,26 +6238,71 @@ function initTTSSettings() {
     });
   }
 
-  async function testSkillChannel(kind = "image", index = 0) {
+  function skillKindLabel(kind = "image") {
+    return kind === "video" ? "视频解析" : kind === "vision" ? "图片理解" : "图像生成";
+  }
+
+  function skillTestPendingText(kind = "image", channel = {}) {
+    const name = channel.name || channel.model || "当前渠道";
+    if (kind === "image") return `正在真实生图测试 ${name}，可能需要 1-3 分钟...`;
+    if (kind === "video") return `正在真实视频解析测试 ${name}，可能需要几十秒...`;
+    return `正在真实识图测试 ${name}...`;
+  }
+
+  function formatSkillTestError(data = {}) {
+    const status = data.status ? `HTTP ${data.status}，` : "";
+    const diagnosis = data.diagnosis ? `；${data.diagnosis}` : "";
+    return `${status}${data.error || "未知错误"}${diagnosis}`;
+  }
+
+  function formatSkillTestSuccess(kind = "image", channel = {}, data = {}) {
+    const action = kind === "image" ? "真实生图正常" : kind === "video" ? "真实视频解析正常" : "真实识图正常";
+    const mode = data.mode ? `，${data.mode}` : "";
+    return `${channel.name || channel.model || "当前渠道"} ${action}，${data.latencyMs || 0}ms${mode}`;
+  }
+
+  function setSkillButtonBusy(button, busy, text = "测试中...") {
+    if (!button) return;
+    if (busy) {
+      if (!button.dataset.originalText) button.dataset.originalText = button.textContent || "";
+      button.disabled = true;
+      button.textContent = text;
+      return;
+    }
+    button.disabled = false;
+    if (button.dataset.originalText) {
+      button.textContent = button.dataset.originalText;
+      delete button.dataset.originalText;
+    }
+  }
+
+  async function testSkillChannel(kind = "image", index = 0, { announce = true, triggerButton = null, manageBusy = true } = {}) {
     syncSkillChannelInputs(kind);
     const state = getSkillChannelState(kind);
     const channel = state.channels[index];
-    if (!channel) return;
+    if (!channel) return null;
+    if (manageBusy) setSkillButtonBusy(triggerButton, true);
     try {
-      showFeedback(state.feedback, "正在测试当前模型...", false, { timeoutMs: 0 });
+      if (announce) showFeedback(state.feedback, skillTestPendingText(kind, channel), false, { timeoutMs: 0 });
       const data = await fetch(`${API}/settings/skills/test-channel`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ skill: kind === "video" ? "videoAnalysis" : kind === "vision" ? "imageVision" : "imageGeneration", channel }),
       }).then(r => r.json());
-      if (data.ok) showFeedback(state.feedback, `${channel.name || channel.model} 连通正常，${data.latencyMs || 0}ms`, false, { timeoutMs: 0 });
-      else showFeedback(state.feedback, `${channel.name || channel.model} 不通：${data.error || "未知错误"}`, true, { timeoutMs: 0 });
+      if (announce) {
+        if (data.ok) showFeedback(state.feedback, formatSkillTestSuccess(kind, channel, data), false, { timeoutMs: 0 });
+        else showFeedback(state.feedback, `${channel.name || channel.model} 不通：${formatSkillTestError(data)}`, true, { timeoutMs: 0 });
+      }
+      return { channel, data, index };
     } catch (err) {
-      showFeedback(state.feedback, err?.message || "测试失败", true, { timeoutMs: 0 });
+      if (announce) showFeedback(state.feedback, err?.message || "测试失败", true, { timeoutMs: 0 });
+      return { channel, data: { ok: false, error: err?.message || "测试失败" }, index };
+    } finally {
+      if (manageBusy) setSkillButtonBusy(triggerButton, false);
     }
   }
 
-  function testActiveSkillChannel(kind = "image") {
+  async function testActiveSkillChannel(kind = "image") {
     syncSkillChannelInputs(kind);
     const state = getSkillChannelState(kind);
     if (!state.channels.length) {
@@ -6264,7 +6310,36 @@ function initTTSSettings() {
       return;
     }
     const activeIndex = state.channels.findIndex(ch => ch.id === state.activeId);
-    testSkillChannel(kind, activeIndex >= 0 ? activeIndex : 0);
+    const firstIndex = activeIndex >= 0 ? activeIndex : 0;
+    setSkillButtonBusy(state.testBtn, true, "测试中...");
+    try {
+      const first = await testSkillChannel(kind, firstIndex, { announce: true, manageBusy: false });
+      if (!first || first.data?.ok || state.failover?.checked === false) return;
+
+      const enabledFallbacks = state.channels
+        .map((channel, index) => ({ channel, index }))
+        .filter(row => row.index !== firstIndex && row.channel.enabled !== false && (row.channel.configured || row.channel.apiKey));
+      if (!enabledFallbacks.length) return;
+
+      const failures = [`${first.channel.name || first.channel.model}: ${formatSkillTestError(first.data)}`];
+      for (const row of enabledFallbacks) {
+        showFeedback(state.feedback, `${first.channel.name || first.channel.model} 不通，正在测试备用渠道 ${row.channel.name || row.channel.model}...`, false, { timeoutMs: 0 });
+        const next = await testSkillChannel(kind, row.index, { announce: false, manageBusy: false });
+        if (next?.data?.ok) {
+          showFeedback(
+            state.feedback,
+            `${skillKindLabel(kind)}当前渠道不通，但备用渠道可用：${formatSkillTestSuccess(kind, next.channel, next.data)}。实际使用会按自动切换走备用渠道。当前错误：${formatSkillTestError(first.data)}`,
+            false,
+            { timeoutMs: 0 },
+          );
+          return;
+        }
+        if (next) failures.push(`${next.channel.name || next.channel.model}: ${formatSkillTestError(next.data)}`);
+      }
+      showFeedback(state.feedback, `${skillKindLabel(kind)}所有启用渠道都不可用：${failures.join("；").slice(0, 900)}`, true, { timeoutMs: 0 });
+    } finally {
+      setSkillButtonBusy(state.testBtn, false);
+    }
   }
 
   async function loadSkillChannelModels(kind = "image", index = 0) {
@@ -6315,7 +6390,7 @@ function initTTSSettings() {
       [channels[index + 1], channels[index]] = [channels[index], channels[index + 1]];
       setSkillChannelState(kind, channels, state.activeId);
     } else if (action === "test") {
-      testSkillChannel(kind, index);
+      testSkillChannel(kind, index, { triggerButton: event.target });
       return;
     } else if (action === "models") {
       loadSkillChannelModels(kind, index);

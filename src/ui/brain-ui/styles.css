@@ -1333,6 +1333,22 @@ body.hotspot-mode .hotspot-btn { color: #ffe7a0; border-color: rgba(255, 210, 90
   overflow-wrap: anywhere;
 }
 .settings-feedback.error { color: var(--warm); }
+.settings-feedback.skill-test-feedback:not(:empty) {
+  flex: 1 1 100%;
+  display: block;
+  min-width: 0;
+  max-height: 104px;
+  overflow: auto;
+  padding: 8px 10px;
+  border: 1px solid rgba(87, 214, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(0, 8, 14, 0.42);
+  white-space: pre-wrap;
+}
+.settings-feedback.skill-test-feedback.error:not(:empty) {
+  border-color: rgba(248, 113, 113, 0.28);
+  background: rgba(127, 29, 29, 0.16);
+}
 
 .settings-toggle {
   position: relative;

@@ -2554,6 +2554,41 @@ function normalizeSkillChannel(raw = {}, defaults = {}, { prefix = 'skill', inde
   }
 }
 
+function diagnoseSkillTestError({ error = '', status = 0, skill = '' } = {}) {
+  const text = String(error || '').toLowerCase()
+  const code = Number(status || 0)
+  if (/invalid api key|incorrect api key|unauthorized|authentication|api key/i.test(error) || code === 401 || code === 403) {
+    return 'API Key 无效、过期，或该 Key 没有当前模型/接口权限。'
+  }
+  if (/service temporarily unavailable|service unavailable|temporarily unavailable|overloaded|upstream/i.test(error) || code === 502 || code === 503 || code === 504) {
+    return '上游服务临时不可用，不代表本地保存失败；可稍后重试或切换备用渠道。'
+  }
+  if (/model.*not.*found|notfound|not found|model_not_found|unknown model/i.test(error) || code === 404) {
+    return '模型名或接口路径不被该 Base URL 支持，请重新获取模型列表或改用兼容模型。'
+  }
+  if (/timeout|timed out|aborted/i.test(error)) {
+    return '请求超时；生图/视频可能需要更长时间，可调大超时或换更稳定渠道。'
+  }
+  if (/images\/generations|image generation|b64_json|url/i.test(error) && skill === 'imageGeneration') {
+    return '该渠道没有按 OpenAI 兼容格式返回图片 URL 或 b64_json。'
+  }
+  if (/video_url|unsupported.*video|invalid.*video/i.test(error) && skill === 'videoAnalysis') {
+    return '该渠道可能不支持 chat/completions 的 video_url 输入格式。'
+  }
+  if (/image_url|unsupported.*image|invalid.*image/i.test(error) && skill === 'imageVision') {
+    return '该渠道可能不支持 chat/completions 的 image_url 输入格式。'
+  }
+  return ''
+}
+
+function withSkillTestDiagnosis(result = {}, skill = '') {
+  if (!result || result.ok) return result
+  return {
+    ...result,
+    diagnosis: result.diagnosis || diagnoseSkillTestError({ error: result.error, status: result.status, skill }),
+  }
+}
+
 function stripSkillChannelSecrets(channels = []) {
   return (Array.isArray(channels) ? channels : []).map(channel => {
     const { apiKey, ...rest } = channel || {}
@@ -2613,6 +2648,7 @@ function normalizeSkillImageConfig(raw = {}) {
     baseUrl: legacyBaseUrl,
     model: legacyModel,
     apiKey: legacyApiKey,
+    requestParams: raw.requestParams || raw.request_params || raw.extraParams || raw.extra_params || {},
     enabled: true,
   }, DEFAULT_SKILL_IMAGE_CONFIG, { prefix: 'image', index: 0, envKey: 'BAILONGMA_IMAGE_API_KEY' })
   const channels = (Array.isArray(raw.channels) && raw.channels.length)
@@ -2717,6 +2753,7 @@ function normalizeSkillImageVisionConfig(raw = {}) {
     baseUrl: legacyBaseUrl,
     model: legacyModel,
     apiKey: legacyApiKey,
+    requestParams: raw.requestParams || raw.request_params || raw.extraParams || raw.extra_params || {},
     enabled: true,
   }, DEFAULT_SKILL_IMAGE_VISION_CONFIG, { prefix: 'vision', index: 0, envKey: 'BAILONGMA_VISION_API_KEY' })
   const channels = (Array.isArray(raw.channels) && raw.channels.length)
@@ -2805,6 +2842,7 @@ function normalizeSkillVideoAnalysisConfig(raw = {}) {
     baseUrl: legacyBaseUrl,
     model: legacyModel,
     apiKey: legacyApiKey,
+    requestParams: raw.requestParams || raw.request_params || raw.extraParams || raw.extra_params || {},
     enabled: true,
   }, DEFAULT_SKILL_VIDEO_ANALYSIS_CONFIG, { prefix: 'video', index: 0, envKey: 'BAILONGMA_VIDEO_API_KEY' })
   const channels = (Array.isArray(raw.channels) && raw.channels.length)
@@ -2882,54 +2920,29 @@ export async function testSkillModelChannel({ skill = 'imageGeneration', channel
   const normalized = normalizeSkillChannel(rawChannel, defaults, { prefix: isVideo ? 'video_test' : isVision ? 'vision_test' : 'image_test', index: 0 })
   if (!normalized.baseUrl || !normalized.model) return { ok: false, error: 'Base URL 和模型不能为空' }
   if (!normalized.apiKey) return { ok: false, error: 'API Key 未填写或未保存' }
+  const imageTestTimeoutSeconds = Math.min(Math.max(Number(saved.apiTimeoutSeconds || defaults.apiTimeoutSeconds || 180), 60), 600)
+  const visionTestTimeoutSeconds = Math.min(Math.max(Number(saved.apiTimeoutSeconds || defaults.apiTimeoutSeconds || 45), 15), 180)
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), isVision ? 35000 : 10000)
+  const timer = setTimeout(() => controller.abort(), isVision ? visionTestTimeoutSeconds * 1000 : kind === 'imageGeneration' ? imageTestTimeoutSeconds * 1000 : 10000)
   const started = Date.now()
   try {
+    if (kind === 'imageGeneration') {
+      const { testWechatImageGenerationRuntime } = await import('./social/image-generation-skill.js')
+      return withSkillTestDiagnosis(await testWechatImageGenerationRuntime(normalized, {
+        timeoutSeconds: imageTestTimeoutSeconds,
+        size: saved.defaultSize || defaults.defaultSize || '1024x1024',
+        quality: saved.defaultQuality || defaults.defaultQuality || 'low',
+      }), kind)
+    }
+
     if (kind === 'imageVision') {
-      // 识图渠道不能只测 /models：很多中转 /models 正常，但图片 chat.completions 会 503/空返回。
-      // 这里用 1x1 PNG 做真实多模态调用，成功且返回非空才算“识图可用”。
-      const tinyPng = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
-      const res = await fetch(`${normalized.baseUrl.replace(/\/$/, '')}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${normalized.apiKey}`,
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: JSON.stringify({
-          ...normalizeSkillRequestParams(normalized.requestParams),
-          model: normalized.model,
-          temperature: 0,
-          max_tokens: 40,
-          messages: [
-            {
-              role: 'user',
-              content: [
-                { type: 'text', text: '这是识图连通测试。请只回答：识图正常' },
-                { type: 'image_url', image_url: { url: `data:image/png;base64,${tinyPng}` } },
-              ],
-            },
-          ],
-        }),
-        signal: controller.signal,
-      })
-      const text = await res.text()
-      let json = null
-      try { json = JSON.parse(text) } catch {}
-      const latencyMs = Date.now() - started
-      if (!res.ok) {
-        const message = json?.error?.message || json?.message || text.slice(0, 240) || `HTTP ${res.status}`
-        return { ok: false, status: res.status, latencyMs, error: message, channel: { ...normalized, apiKey: undefined, configured: true }, mode: 'vision_chat_completions' }
-      }
-      const content = String(json?.choices?.[0]?.message?.content || '').trim()
-      if (!content) return { ok: false, status: res.status, latencyMs, error: '识图接口连通但返回空内容', channel: { ...normalized, apiKey: undefined, configured: true }, mode: 'vision_chat_completions' }
-      return { ok: true, status: res.status, latencyMs, message: content.slice(0, 120), channel: { ...normalized, apiKey: undefined, configured: true }, mode: 'vision_chat_completions' }
+      const { testWeChatImageVisionRuntime } = await import('./social/wechat-image-vision.js')
+      return withSkillTestDiagnosis(await testWeChatImageVisionRuntime(normalized, { timeoutSeconds: visionTestTimeoutSeconds }), kind)
     }
 
     if (isVideo) {
       const { testWechatVideoAnalysisRuntime } = await import('./social/wechat-video-analysis-skill.js')
-      return await testWechatVideoAnalysisRuntime(normalized, { timeoutSeconds: 30 })
+      return withSkillTestDiagnosis(await testWechatVideoAnalysisRuntime(normalized, { timeoutSeconds: Math.min(Math.max(Number(saved.apiTimeoutSeconds || defaults.apiTimeoutSeconds || 90), 30), 300) }), kind)
     }
 
     const res = await fetch(`${normalized.baseUrl.replace(/\/$/, '')}/models`, {
@@ -2943,12 +2956,13 @@ export async function testSkillModelChannel({ skill = 'imageGeneration', channel
     const latencyMs = Date.now() - started
     if (!res.ok) {
       const message = json?.error?.message || json?.message || text.slice(0, 240) || `HTTP ${res.status}`
-      return { ok: false, status: res.status, latencyMs, error: message, channel: { ...normalized, apiKey: undefined, configured: true } }
+      return withSkillTestDiagnosis({ ok: false, status: res.status, latencyMs, error: message, channel: { ...normalized, apiKey: undefined, configured: true } }, kind)
     }
     const models = Array.isArray(json?.data) ? json.data.map(item => item?.id || item?.model).filter(Boolean).slice(0, 20) : []
     return { ok: true, status: res.status, latencyMs, models, channel: { ...normalized, apiKey: undefined, configured: true } }
   } catch (err) {
-    return { ok: false, latencyMs: Date.now() - started, error: err?.name === 'AbortError' ? '连通测试超时（10 秒）' : (err?.message || String(err)), channel: { ...normalized, apiKey: undefined, configured: true } }
+    const timeoutText = isVision ? `${visionTestTimeoutSeconds} 秒` : kind === 'imageGeneration' ? `${imageTestTimeoutSeconds} 秒` : '10 秒'
+    return withSkillTestDiagnosis({ ok: false, latencyMs: Date.now() - started, error: err?.name === 'AbortError' ? `连通测试超时（${timeoutText}）` : (err?.message || String(err)), channel: { ...normalized, apiKey: undefined, configured: true } }, kind)
   } finally {
     clearTimeout(timer)
   }

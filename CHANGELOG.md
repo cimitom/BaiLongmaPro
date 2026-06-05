@@ -21,14 +21,21 @@
 - 修复微信群视频解析进度提示误触本机文件隐私拦截的问题；视频解析渠道测试改为真实 `chat/completions` + `video_url` 请求，避免 `/models` 可用但实际解析返回 NotFound 时被误判为可用。
 - 修复 GitHub Actions Release workflow 中 Windows 与 macOS 矩阵并发发布同一 tag 时抢建同一个 GitHub Release，导致 macOS 发布阶段出现 `already_exists field=tag_name` 422 错误的问题；发布矩阵现在串行执行，保留单平台手动补发能力。
 - 修复 GitHub issue #12：微信群图片识别在 `base64` 未保存时会同时兼容 `userDir`、`dataDir` 和安全范围内的绝对图片路径，避免历史入库图片因路径解析失败直接报“文件不存在”；同时让“解释/总结/识别图片”优先走自然语言识图回复，不再误触发“从当前群图片库发给你”的原图转发分支。
+- 生图 Skill 的模型测试改为真实调用 `/images/generations`，不再只测 `/models`，避免“测试正常但实际生图不可用”的误判。
+- 生图、识图、视频解析的真实调用都会带上渠道池里的自定义请求参数；旧版顶层配置迁移到默认渠道时也会保留这些参数。
+- 识图与视频解析的模型测试复用实际运行链路，失败时补充 API Key 无效、上游 503、模型不存在、超时、图片/视频输入格式不支持等中文诊断。
+- 多模态设置页增强测试反馈：测试中禁用对应按钮，长错误固定在可滚动结果区内；当前渠道失败且备用渠道可用时会明确提示实际运行会自动切换。
 
 ### 规范
 - `AGENTS.md` 新增发布纪律：每次完成代码、配置或项目规范修改后必须新增并推送新的 Git tag 触发 GitHub Actions，禁止复用或改写既有 tag；同时要求详细说明修改内容、原因、验证结果和部署注意事项。
 
 ### 验证
 - 通过 `node --check src/social/wechat-group-backup.js`、`node --check src/api.js`、`node --check src/ui/brain-ui/app.js`、`node --check src/ui/brain-ui/app-shell.js`。
+- 通过 `node --check src/social/image-generation-skill.js`、`node --check src/social/wechat-image-vision.js`、`node --check src/social/wechat-video-analysis-skill.js`、`node --check scripts/test-wechat-multimodal-skill.mjs`。
 - 通过新增 `npm run test:wechat-group-backup`，覆盖白名单导出、排除敏感配置、未登录/缓存群/同名群拒绝、精确 ID 匹配、唯一群名确认导入、重复导入幂等、`source_message_id` 重映射、FTS 重建和媒体恢复。
+- 通过新增 `npm run test:wechat-multimodal-skill`，覆盖生图真实 `/images/generations`、识图/视频真实 `chat/completions` 多模态请求、渠道自定义参数透传和 503 中文诊断。
 - 通过 `npm run smoke:brain-ui`，新增检查 `1280x840`、`390x844`、`320x720` 三种视口下“群组备份与迁移”面板无横向溢出、按钮不可读、卡片撑破或结果区遮挡。
+- `npm run smoke:brain-ui` 同时覆盖多模态 Skill 测试反馈区，验证桌面/窄屏下长错误不溢出、不遮挡按钮且结果区可滚动。
 - 通过 `node --check src/social/wechat-video-analysis-skill.js`、`node --check src/social/wechaty-duty-group.js`、`node --check src/config.js` 和 `npm run test:wechat-video-analysis`。
 - 通过 PowerShell 检查 `.github/workflows/release.yml` 包含 `max-parallel: 1`。
 - 通过 `node -e "JSON.parse(require('fs').readFileSync('package.json','utf8'))"`。

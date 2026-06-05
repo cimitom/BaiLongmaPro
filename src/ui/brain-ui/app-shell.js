@@ -864,7 +864,7 @@ const createSettingsModal = () => `
                 <button class="settings-save-btn primary" id="skill-image-save-btn" type="button">保存图像生成</button>
                 <button class="settings-save-btn" id="skill-image-test-btn" type="button">测试当前模型</button>
                 <button class="settings-save-btn" id="skill-image-add-channel-btn" type="button">新增渠道</button>
-                <span class="settings-feedback" id="skill-image-feedback"></span>
+                <span class="settings-feedback skill-test-feedback" data-feedback-class="skill-test-feedback" id="skill-image-feedback"></span>
               </div>
               <details class="multimodal-advanced">
                 <summary>高级渠道池</summary>
@@ -921,7 +921,7 @@ const createSettingsModal = () => `
                 <button class="settings-save-btn" id="skill-vision-test-btn" type="button">测试当前模型</button>
                 <button class="settings-save-btn" id="skill-vision-add-channel-btn" type="button">新增渠道</button>
                 <button class="settings-save-btn" id="skill-vision-refresh-btn" type="button">刷新状态</button>
-                <span class="settings-feedback" id="skill-vision-feedback"></span>
+                <span class="settings-feedback skill-test-feedback" data-feedback-class="skill-test-feedback" id="skill-vision-feedback"></span>
               </div>
               <details class="multimodal-advanced">
                 <summary>高级渠道池</summary>
@@ -983,7 +983,7 @@ const createSettingsModal = () => `
                 <button class="settings-save-btn" id="skill-video-test-btn" type="button">测试当前模型</button>
                 <button class="settings-save-btn" id="skill-video-add-channel-btn" type="button">新增渠道</button>
                 <button class="settings-save-btn" id="skill-video-refresh-btn" type="button">刷新状态</button>
-                <span class="settings-feedback" id="skill-video-feedback"></span>
+                <span class="settings-feedback skill-test-feedback" data-feedback-class="skill-test-feedback" id="skill-video-feedback"></span>
               </div>
               <details class="multimodal-advanced">
                 <summary>高级渠道池</summary>
@@ -2040,11 +2040,12 @@ const createSettingsModal = () => `
                 <p class="release-note-summary">新增微信群组备份与迁移：按群安全迁移聊天流水、图片解析、群记忆和成员记忆。</p>
                 <ul class="release-note-points">
                   <li>数据库页新增“群组备份与迁移”，支持搜索群组、勾选导出、完整媒体/仅元数据模式和导入预览。</li>
-                  <li>备份只包含微信群数据白名单，排除 LLM、Skill、知识库、密钥、token、embedding 和 Honcho 同步字段。</li>
-                  <li>导入前实时读取当前在线微信号的真实群列表；无群、同名重复、缓存列表或未登录都会跳过。</li>
-                  <li>导入默认合并去重并重建 FTS；唯一群名匹配需要手动确认，避免同名群误导入。</li>
-                </ul>
-              </article>
+	                  <li>备份只包含微信群数据白名单，排除 LLM、Skill、知识库、密钥、token、embedding 和 Honcho 同步字段。</li>
+	                  <li>导入前实时读取当前在线微信号的真实群列表；无群、同名重复、缓存列表或未登录都会跳过。</li>
+	                  <li>导入默认合并去重并重建 FTS；唯一群名匹配需要手动确认，避免同名群误导入。</li>
+	                  <li>生图、识图、视频解析模型测试改为真实运行链路，并增强错误诊断、备用渠道提示和长错误反馈布局。</li>
+	                </ul>
+	              </article>
               <article class="release-note-card">
                 <div class="release-note-head">
                   <span class="release-note-version">v0.4.92</span>
