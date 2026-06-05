@@ -932,6 +932,10 @@ const createSettingsModal = () => `
                 <button class="settings-save-btn danger" id="wechaty-relogin-btn" type="button">强制重新扫码</button>
               </div>
             </div>
+            <div class="wechaty-qr-area" id="wechaty-qr-area" style="display:none;">
+              <img id="wechaty-qr-img" src="" alt="Wechaty 微信登录二维码">
+              <div>用要接入群聊的微信扫码登录；登录成功后会自动获取群列表。二维码如果过期，请点“强制重新扫码”。</div>
+            </div>
             <div class="wechaty-toolbar">
               <label class="wechaty-master-toggle">
                 <input id="wechaty-duty-enabled" type="checkbox" checked>
@@ -940,7 +944,7 @@ const createSettingsModal = () => `
               <button class="settings-save-btn" id="wechaty-refresh-rooms-btn" type="button">刷新真实群列表</button>
             </div>
             <div class="wechaty-concurrency-card">
-              <div>
+              <div class="wechaty-concurrency-copy">
                 <div class="wechaty-login-title">并发回复上限</div>
                 <p class="settings-hint compact">同时限制 @ 必回和自由接话任务；@ 必回优先，不会被自由接话挤掉。</p>
               </div>
@@ -1022,10 +1026,6 @@ const createSettingsModal = () => `
               <div class="wechaty-subsection-title">图片接话策略</div>
               <p class="settings-hint compact">图片必须先完成识图再接话；默认查询 3 次，每次间隔 5 秒。三次后仍未解析完成，本轮直接放弃，不根据占位文本胡编。</p>
               <div class="wechaty-ambient-last" id="wechaty-ambient-image-last">暂无图片判断记录。</div>
-            </div>
-            <div class="wechaty-qr-area" id="wechaty-qr-area" style="display:none;">
-              <img id="wechaty-qr-img" src="" alt="Wechaty 微信登录二维码">
-              <div>用要接入群聊的微信扫码登录；登录成功后会自动获取群列表。二维码如果过期，请点“强制重新扫码”。</div>
             </div>
             <div class="wechaty-offline-notify-card">
               <div class="wechaty-subsection-head">

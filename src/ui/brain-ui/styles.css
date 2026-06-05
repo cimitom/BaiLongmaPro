@@ -4601,16 +4601,22 @@ body.person-card-mode .person-card-panel,
   scroll-margin-top: 86px;
 }
 .wechaty-qr-area {
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
-  border: 1px dashed rgba(87, 214, 255, 0.45);
-  border-radius: 12px;
-  padding: 10px;
-  margin: 6px 0 12px;
+  gap: 14px;
+  border: 1px solid rgba(87, 214, 255, 0.36);
+  border-radius: 14px;
+  padding: 12px;
+  margin: -6px 0 12px;
   color: var(--ink2);
   font-size: 11px;
   line-height: 1.5;
-  background: rgba(87, 214, 255, 0.045);
+  background: rgba(87, 214, 255, 0.075);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+}
+.wechaty-qr-area > div {
+  flex: 1 1 220px;
+  min-width: 180px;
 }
 
 .wechaty-console-hero {
@@ -4918,11 +4924,12 @@ body.person-card-mode .person-card-panel,
   max-height: 560px;
 }
 .wechaty-qr-area img {
-  width: 132px;
-  height: 132px;
-  border-radius: 10px;
+  width: 156px;
+  height: 156px;
+  flex: 0 0 156px;
+  border-radius: 12px;
   background: white;
-  padding: 6px;
+  padding: 7px;
 }
 .wechaty-persona-panel,
 .wechaty-admin-panel,
@@ -6073,47 +6080,62 @@ body.person-card-mode .person-card-panel,
   flex: 0 0 auto;
 }
 .wechaty-concurrency-card {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, auto);
-  gap: 12px;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  flex-wrap: wrap;
   margin: 0 0 12px;
-  padding: 12px 14px;
+  padding: 10px 12px;
   border: 1px solid rgba(87,214,255,0.18);
   border-radius: 14px;
   background: rgba(87,214,255,0.045);
 }
+.wechaty-concurrency-copy {
+  min-width: 240px;
+  flex: 1 1 300px;
+}
+.wechaty-concurrency-copy .wechaty-login-title {
+  white-space: nowrap;
+}
+.wechaty-concurrency-copy .settings-hint {
+  max-width: none;
+  margin: 4px 0 0;
+}
 .wechaty-concurrency-controls {
   display: flex;
-  align-items: end;
+  align-items: center;
   justify-content: flex-end;
-  gap: 9px;
+  gap: 8px;
   flex-wrap: wrap;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 .wechaty-concurrency-controls label {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  min-width: 120px;
+  min-width: 112px;
   color: var(--ink2);
   font-size: 11px;
 }
 .wechaty-concurrency-controls .settings-select {
-  width: 120px;
+  width: 112px;
 }
 .wechaty-concurrency-status {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   min-height: 30px;
-  padding: 0 10px;
+  padding: 5px 10px;
   border: 1px solid rgba(114,255,195,0.24);
-  border-radius: 999px;
+  border-radius: 10px;
   color: #aafbdd;
   background: rgba(114,255,195,0.08);
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 10px;
-  white-space: normal;
-  max-width: 420px;
+  white-space: nowrap;
+  max-width: 100%;
   line-height: 1.45;
 }
 .wechaty-ambient-card,
@@ -6380,10 +6402,17 @@ body.person-card-mode .person-card-panel,
     grid-template-columns: 1fr;
   }
   .wechaty-concurrency-card {
-    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+  .wechaty-concurrency-copy {
+    min-width: 0;
+    flex-basis: 100%;
   }
   .wechaty-concurrency-controls {
     justify-content: flex-start;
+  }
+  .wechaty-concurrency-status {
+    white-space: normal;
   }
   .wechaty-ambient-levels,
   .wechaty-ambient-rules,
